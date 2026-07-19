@@ -1,0 +1,137 @@
+:root {
+  --ink: #2b2420;
+  --paper: #f7f2e7;
+  --accent: #8c3b2e;
+  --accent2: #3b5d4f;
+  --line: #d8cdb8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+header {
+  padding: 16px;
+  text-align: center;
+  border-bottom: 2px solid var(--line);
+}
+
+header h1 { margin: 0; font-size: 1.4rem; }
+header p { margin: 4px 0 0; color: #6b5f4f; font-size: 0.85rem; }
+
+nav.tabs {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+nav.tabs button {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 6px;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #6b5f4f;
+  border-bottom: 3px solid transparent;
+}
+
+nav.tabs button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: bold;
+}
+
+main { padding: 16px; max-width: 720px; margin: 0 auto; }
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.text-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--accent2);
+  color: #fff;
+}
+
+.passage {
+  font-size: 1.1rem;
+  line-height: 2;
+  white-space: pre-wrap;
+}
+
+.options button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.options button.correct { background: #e2f3e6; border-color: var(--accent2); }
+.options button.wrong { background: #fbe4e0; border-color: var(--accent); }
+
+.hp-bar {
+  height: 14px;
+  border-radius: 999px;
+  background: #eee;
+  overflow: hidden;
+  margin: 4px 0 8px;
+}
+.hp-fill { height: 100%; background: var(--accent2); transition: width .3s; }
+.hp-fill.enemy { background: var(--accent); }
+
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.wenhao-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.wenhao-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  text-align: center;
+  background: #fff;
+}
+.wenhao-card.locked { opacity: 0.45; }
+
+@media (max-width: 480px) {
+  main { padding: 10px; }
+}

@@ -1,0 +1,52 @@
+// 端到端煙霧測試：選文 → 閃卡 → 自測 → 對戰 → 文豪錄，390px 手機寬度不跑版、無 console error。
+import { chromium } from 'playwright-core';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+
+const server = createServer(async (req, res) => {
+  try {
+    const path = req.url === '/' ? '/index.html' : req.url;
+    const data = await readFile(join(ROOT, path));
+    res.writeHead(200, { 'Content-Type': MIME[extname(path)] || 'text/plain' });
+    res.end(data);
+  } catch {
+    res.writeHead(404);
+    res.end('not found');
+  }
+});
+
+await new Promise((r) => server.listen(8099, r));
+
+const errors = [];
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+page.on('pageerror', (err) => errors.push(String(err)));
+
+await page.goto('http://localhost:8099');
+await page.waitForSelector('.text-list-item');
+await page.click('.text-list-item');
+await page.waitForSelector('.passage');
+
+for (const tab of ['flashcard', 'quiz', 'battle', 'wenhao']) {
+  await page.click(`nav.tabs button[data-tab="${tab}"]`);
+  await page.waitForTimeout(300);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
+  if (overflow) errors.push(`tab ${tab} 在 390px 寬度發生橫向跑版`);
+}
+
+await browser.close();
+server.close();
+
+if (errors.length) {
+  console.log('❌ smoke test 發現問題：');
+  errors.forEach((e) => console.log(' -', e));
+  process.exit(1);
+} else {
+  console.log('✅ smoke test 全部通過（ALL CLEAN）。');
+}
