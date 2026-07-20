@@ -13,7 +13,7 @@ const WYFlashcard = (() => {
     // 閃卡卡面 = 每個 segment，正面原文、背面段旨提示（取該段第一題 gist 題幹當提示）
     queue = t.segments.map((seg) => ({
       front: seg.text,
-      back: (t.questions.find((q) => q.type === 'gist' && q.stem.includes(seg.text.slice(0, 4))) || {}).explain || '（無段旨提示）',
+      back: (t.questions.find((q) => q.type === 'gist' && q.stem.includes(seg.text.slice(0, 4))) || {}).explain || '本段為承接／開篇段落，暫無獨立段旨提示，可直接翻回正面複習原文。',
     }));
     idx = 0;
     return queue;

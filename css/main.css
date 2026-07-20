@@ -1,62 +1,160 @@
 :root {
-  --ink: #2b2420;
-  --paper: #f7f2e7;
-  --accent: #8c3b2e;
-  --accent2: #3b5d4f;
-  --line: #d8cdb8;
+  /* 墨階（濃淡乾濕清五色） */
+  --ink-jiao:#1a1613; --ink-nong:#2b2420; --ink-zhong:#4a4038;
+  --ink-dan:#7d726a; --ink-qing:#b8ab9c; --ink-xi:#d9cfc0;
+
+  /* 宣紙 */
+  --paper:#f7f2e7; --paper-warm:#efe6d3; --paper-aged:#e6d9bf;
+
+  /* 點綴色 */
+  --zhu:#9e3b2c; --zhu-light:#c85a45;
+  --yan:#8a3d4a;
+  --qing-shi:#3a5a6e; --qing-shi-light:#5c7f94;
+  --dai:#3b5d4f;
+
+  --accent: var(--zhu);
+  --accent2: var(--dai);
+  --ink: var(--ink-nong);
+  --line: var(--ink-xi);
+
+  --font-brush:"Ma Shan Zheng","LXGW WenKai TC",cursive;
+  --font-read:"Noto Serif TC","LXGW WenKai TC",serif;
+  --font-ui:"Noto Sans TC",system-ui,sans-serif;
+
+  --shadow-paper:0 6px 18px rgba(26,22,19,.10);
+  --shadow-lift:0 10px 30px rgba(26,22,19,.16);
 }
 
 * { box-sizing: border-box; }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
 body {
   margin: 0;
-  font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
-  background: var(--paper);
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(ellipse 60% 40% at 8% 6%, rgba(74,64,56,.05), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 95% 100%, rgba(74,64,56,.04), transparent 60%),
+    var(--paper);
   color: var(--ink);
   min-height: 100vh;
 }
 
-header {
-  padding: 16px;
-  text-align: center;
-  border-bottom: 2px solid var(--line);
+/* 宣紙底噪紋理，全站僅此一層 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .05;
+  mix-blend-mode: multiply;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%25" height="100%25" filter="url(%23n)"/></svg>');
 }
 
-header h1 { margin: 0; font-size: 1.4rem; }
-header p { margin: 4px 0 0; color: #6b5f4f; font-size: 0.85rem; }
+header, nav.tabs, main, footer { position: relative; z-index: 1; }
+
+header {
+  padding: 22px 16px 26px;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 70% 120% at 50% -20%, rgba(158,59,44,.06), transparent 65%);
+}
+
+header h1 {
+  margin: 0;
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 2rem;
+  letter-spacing: .08em;
+  color: var(--ink-jiao);
+}
+
+header p {
+  margin: 6px 0 0;
+  color: var(--ink-dan);
+  font-size: .85rem;
+  letter-spacing: .04em;
+}
 
 nav.tabs {
   display: flex;
   overflow-x: auto;
+  gap: 2px;
+  padding: 6px 8px 0;
+  background: var(--paper-warm);
   border-bottom: 1px solid var(--line);
 }
 
 nav.tabs button {
   flex: 1;
   min-width: 80px;
-  padding: 10px 6px;
+  padding: 10px 6px 12px;
   border: none;
-  background: none;
-  font-size: 0.9rem;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: .9rem;
+  font-weight: 500;
   cursor: pointer;
-  color: #6b5f4f;
+  color: var(--ink-dan);
   border-bottom: 3px solid transparent;
+  transition: color .15s, background-color .15s;
 }
 
+nav.tabs button:hover { color: var(--ink-zhong); background: rgba(74,64,56,.05); }
+
 nav.tabs button.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-  font-weight: bold;
+  color: var(--zhu);
+  font-weight: 700;
+  background: var(--paper);
+  border-bottom-color: var(--zhu);
+}
+
+/* 印章式 active 標記，不只靠顏色區分 */
+nav.tabs button.active::after {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-left: 4px;
+  border-radius: 1px;
+  background: var(--zhu);
+  vertical-align: middle;
 }
 
 main { padding: 16px; max-width: 720px; margin: 0 auto; }
 
 .card {
-  background: #fff;
+  background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 4px;
+  padding: 18px;
   margin-bottom: 12px;
+  box-shadow: var(--shadow-paper);
+  position: relative;
+}
+
+/* 卡片四角淡墨飛白 */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 40% 30% at 0% 0%, rgba(74,64,56,.10), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 100% 100%, rgba(74,64,56,.08), transparent 70%);
+}
+
+.card h2, .card h3 {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  letter-spacing: .05em;
+  color: var(--ink-jiao);
+  margin-top: 0;
 }
 
 .text-list-item {
@@ -64,57 +162,183 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  transition: box-shadow .15s, transform .15s;
 }
+
+.text-list-item:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
 
 .badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  background: var(--accent2);
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: .75rem;
+  background: var(--qing-shi);
   color: #fff;
+  letter-spacing: .03em;
 }
 
 .passage {
-  font-size: 1.1rem;
-  line-height: 2;
+  font-family: var(--font-read);
+  font-size: 1.15rem;
+  line-height: 2.05;
+  letter-spacing: .04em;
   white-space: pre-wrap;
+  color: var(--ink-jiao);
 }
 
 .options button {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
+  padding: 12px 14px;
   margin: 6px 0;
+  min-height: 44px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: 6px;
+  background: var(--paper);
   cursor: pointer;
-  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  font-size: .95rem;
+  color: var(--ink);
+  transition: border-color .15s, background-color .15s;
 }
 
-.options button.correct { background: #e2f3e6; border-color: var(--accent2); }
-.options button.wrong { background: #fbe4e0; border-color: var(--accent); }
+.options button:hover:not(:disabled) { border-color: var(--ink-qing); background: var(--paper-warm); }
+.options button:disabled { cursor: default; }
+
+.options button.correct {
+  background: rgba(59,93,79,.10);
+  border-color: var(--dai);
+  border-width: 2px;
+  font-weight: 700;
+}
+.options button.correct::before { content: "✓ "; color: var(--dai); }
+
+.options button.wrong {
+  background: rgba(138,61,74,.08);
+  border-color: var(--yan);
+  border-width: 2px;
+}
+.options button.wrong::before { content: "✗ "; color: var(--yan); }
 
 .hp-bar {
   height: 14px;
-  border-radius: 999px;
-  background: #eee;
+  border-radius: 3px;
+  background: var(--paper-aged);
+  border: 1px solid var(--line);
   overflow: hidden;
-  margin: 4px 0 8px;
+  margin: 4px 0 10px;
 }
-.hp-fill { height: 100%; background: var(--accent2); transition: width .3s; }
-.hp-fill.enemy { background: var(--accent); }
+.hp-fill { height: 100%; background: var(--dai); transition: width .35s ease-out; }
+.hp-fill.enemy { background: var(--zhu); }
 
 button.primary {
-  background: var(--accent);
+  background: var(--zhu);
   color: #fff;
   border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
+  padding: 10px 18px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: .95rem;
+  letter-spacing: .02em;
+  transition: background-color .15s, transform .1s;
+}
+button.primary:hover { background: var(--zhu-light); }
+button.primary:active { transform: scale(.97); }
+
+/* 閃卡翻面 */
+.flashcard {
+  perspective: 1200px;
+  cursor: pointer;
+  min-height: 180px;
+  margin: 10px 0;
+}
+.flashcard-inner {
+  position: relative;
+  width: 100%;
+  min-height: 180px;
+  transition: transform .5s cubic-bezier(.4,.2,.2,1);
+  transform-style: preserve-3d;
+}
+.flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+.flashcard-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+}
+.flashcard-front {
+  background: var(--paper);
+}
+.flashcard-back {
+  transform: rotateY(180deg);
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 15%, rgba(74,64,56,.16), transparent 65%),
+    radial-gradient(ellipse 55% 45% at 85% 85%, rgba(158,59,44,.10), transparent 65%),
+    var(--paper-warm);
+}
+.flashcard-back .hint-label {
+  font-family: var(--font-brush);
+  color: var(--zhu);
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+.flip-hint {
+  display: block;
+  margin-top: 10px;
+  font-size: .75rem;
+  color: var(--ink-dan);
+}
+
+/* 對戰對手選單 */
+.opponent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+.opponent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: .85rem;
+  color: var(--ink);
+}
+.opponent-card img {
+  width: 72px; height: 72px;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 50%;
+  border: 2px solid var(--zhu);
+  background: var(--paper-warm);
+}
+.opponent-card.locked { opacity: .45; cursor: not-allowed; }
+.opponent-card.locked img { border-color: var(--ink-qing); filter: grayscale(.6); }
+
+.battle-vs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.battle-portrait {
+  width: 64px; height: 64px;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 50%;
+  border: 2px solid var(--zhu);
+  flex-shrink: 0;
 }
 
 .wenhao-grid {
@@ -125,13 +349,25 @@ button.primary {
 
 .wenhao-card {
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 4px;
+  padding: 14px 10px;
   text-align: center;
-  background: #fff;
+  background: var(--paper);
+  box-shadow: var(--shadow-paper);
 }
-.wenhao-card.locked { opacity: 0.45; }
+.wenhao-card strong { font-family: var(--font-brush); font-weight: 400; letter-spacing: .04em; }
+.wenhao-card.locked { opacity: 0.42; filter: grayscale(.3); }
+.wenhao-portrait {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+}
 
 @media (max-width: 480px) {
   main { padding: 10px; }
+  header h1 { font-size: 1.6rem; }
 }
