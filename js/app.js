@@ -53,9 +53,12 @@ function renderList() {
   });
 }
 
+let flashcardFlipped = false;
+
 function renderFlashcard() {
   if (!currentTextId) currentTextId = TEXTS[0]?.id;
   WYFlashcard.buildQueue(currentTextId);
+  flashcardFlipped = false;
   drawFlashcard();
 }
 
@@ -66,15 +69,30 @@ function drawFlashcard() {
   app.innerHTML = `
     <div class="card">
       <div class="badge">${p.idx}/${p.total}</div>
-      <p class="passage">${card.front}</p>
-      <details><summary>看段旨提示</summary><p>${card.back}</p></details>
+      <div class="flashcard ${flashcardFlipped ? 'flipped' : ''}" id="flashcardEl">
+        <div class="flashcard-inner">
+          <div class="flashcard-face flashcard-front">
+            <p class="passage">${card.front}</p>
+            <span class="flip-hint">點卡片看段旨提示 ▸</span>
+          </div>
+          <div class="flashcard-face flashcard-back">
+            <p class="hint-label">段旨提示</p>
+            <p>${card.back}</p>
+            <span class="flip-hint">點卡片翻回原文 ▸</span>
+          </div>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="primary" id="prevBtn">上一張</button>
         <button class="primary" id="nextBtn">下一張</button>
       </div>
     </div>`;
-  document.getElementById('prevBtn').onclick = () => { WYFlashcard.prev(); drawFlashcard(); };
-  document.getElementById('nextBtn').onclick = () => { WYFlashcard.next(); drawFlashcard(); };
+  document.getElementById('flashcardEl').onclick = () => {
+    flashcardFlipped = !flashcardFlipped;
+    document.getElementById('flashcardEl').classList.toggle('flipped', flashcardFlipped);
+  };
+  document.getElementById('prevBtn').onclick = () => { flashcardFlipped = false; WYFlashcard.prev(); drawFlashcard(); };
+  document.getElementById('nextBtn').onclick = () => { flashcardFlipped = false; WYFlashcard.next(); drawFlashcard(); };
 }
 
 function renderQuiz() {
@@ -119,8 +137,14 @@ function drawQuiz() {
 
 function renderBattle() {
   const roster = WYBattle.unlockedRoster();
-  app.innerHTML = `<div class="card"><h3>選擇對手</h3>${roster.map((r) => `
-    <button class="primary" style="margin:4px;${r.unlocked ? '' : 'opacity:.4'}" data-id="${r.id}" ${r.unlocked ? '' : 'disabled'}>${r.name}${r.unlocked ? '' : '（未解鎖）'}</button>`).join('')}
+  app.innerHTML = `<div class="card"><h3>選擇對手</h3>
+    <div class="opponent-grid">
+      ${roster.map((r) => `
+        <button class="opponent-card ${r.unlocked ? '' : 'locked'}" data-id="${r.id}" ${r.unlocked ? '' : 'disabled'}>
+          <img src="${r.img}" alt="${r.name}" />
+          <span>${r.name}${r.unlocked ? '' : '（未解鎖）'}</span>
+        </button>`).join('')}
+    </div>
     <p style="font-size:.8rem;color:#6b5f4f;">解鎖條件：對應篇目答對率達 80% 以上</p></div>`;
   app.querySelectorAll('button[data-id]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -138,10 +162,15 @@ function drawBattle() {
   const q = currentQuiz.questions[currentQIdx % currentQuiz.questions.length];
   app.innerHTML = `
     <div class="card">
-      <strong>${b.opponent.name}</strong>
-      <div class="hp-bar"><div class="hp-fill enemy" style="width:${b.opponent.curHp}%"></div></div>
-      <strong>你</strong>
-      <div class="hp-bar"><div class="hp-fill" style="width:${b.player.curHp}%"></div></div>
+      <div class="battle-vs">
+        <img class="battle-portrait" src="${b.opponent.img}" alt="${b.opponent.name}" />
+        <div style="flex:1;">
+          <strong>${b.opponent.name}</strong>
+          <div class="hp-bar"><div class="hp-fill enemy" style="width:${b.opponent.curHp}%"></div></div>
+          <strong>你</strong>
+          <div class="hp-bar"><div class="hp-fill" style="width:${b.player.curHp}%"></div></div>
+        </div>
+      </div>
       <p>${q.stem}</p>
       <div class="options">${q.options.map((opt, i) => `<button data-i="${i}">${opt}</button>`).join('')}</div>
       <p style="font-size:.85rem;color:#6b5f4f;">${b.log.slice(-1)[0] || ''}</p>
@@ -170,6 +199,7 @@ function renderWenhao() {
     <div class="wenhao-grid">
       ${roster.map((r) => `
         <div class="wenhao-card ${r.unlocked ? '' : 'locked'}">
+          <img src="${r.img}" alt="${r.title}" class="wenhao-portrait" />
           <strong>${r.title}</strong>
           <div style="font-size:.8rem;">${r.author}</div>
           <div style="font-size:.8rem;">${r.unlocked ? '已收錄' : `答對率 ${r.progress}%`}</div>
