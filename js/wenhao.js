@@ -3,12 +3,7 @@
 const WYWenhao = (() => {
   let texts = [];
 
-  const PORTRAIT = {
-    t01: 'assets/characters/zhuge_home.png',
-    t02: 'assets/characters/taoyuanming.png',
-    t03: 'assets/characters/zhuzhiwu.png',
-    t04: 'assets/characters/zhuge_war.png',
-  };
+  const PORTRAIT = Object.fromEntries(WYBattle.ROSTER.map((r) => [r.unlockText, r.img]));
 
   function init(allTexts) {
     texts = allTexts;

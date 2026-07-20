@@ -348,12 +348,20 @@ button.primary:active { transform: scale(.97); }
 }
 
 .wenhao-card {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 14px 10px;
   text-align: center;
   background: var(--paper);
   box-shadow: var(--shadow-paper);
+}
+.wenhao-no {
+  position: absolute;
+  top: 6px; left: 8px;
+  font-size: .68rem;
+  color: var(--ink-qing);
+  letter-spacing: .05em;
 }
 .wenhao-card strong { font-family: var(--font-brush); font-weight: 400; letter-spacing: .04em; }
 .wenhao-card.locked { opacity: 0.42; filter: grayscale(.3); }
@@ -365,6 +373,135 @@ button.primary:active { transform: scale(.97); }
   border-radius: 4px;
   margin-bottom: 8px;
   border: 1px solid var(--line);
+}
+
+/* 選文詳情頁：逐段原文 + 語譯/注釋/賞析三分頁 */
+.link-back {
+  background: none;
+  border: none;
+  color: var(--qing-shi);
+  font-family: var(--font-ui);
+  font-size: .85rem;
+  cursor: pointer;
+  padding: 0 0 8px;
+  display: block;
+}
+.link-back:hover { color: var(--zhu); }
+
+.segment-block { padding-bottom: 14px; }
+.segment-original { margin-bottom: 10px; }
+
+.seg-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.seg-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 10px 8px;
+  font-family: var(--font-ui);
+  font-size: .8rem;
+  color: var(--ink-dan);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.seg-tab-btn:hover { color: var(--ink-zhong); }
+.seg-tab-btn.active {
+  color: var(--zhu);
+  font-weight: 700;
+  border-bottom-color: var(--zhu);
+}
+
+.seg-translation, .seg-note {
+  font-family: var(--font-read);
+  font-size: .98rem;
+  line-height: 1.9;
+  color: var(--ink-zhong);
+}
+
+.glossary-list {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: .92rem;
+  line-height: 1.9;
+  color: var(--ink-zhong);
+}
+.glossary-list strong { color: var(--zhu); font-family: var(--font-read); }
+
+/* 連續學習天數徽章 */
+.streak-banner {
+  text-align: center;
+  font-family: var(--font-brush);
+  font-size: 1.05rem;
+  color: var(--zhu);
+  padding: 10px 18px;
+}
+
+/* 自測題型分頁 */
+.quiz-type-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.quiz-type-btn {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 14px;
+  padding: 5px 12px;
+  font-size: .78rem;
+  color: var(--ink-dan);
+  cursor: pointer;
+}
+.quiz-type-btn:hover { border-color: var(--ink-qing); }
+.quiz-type-btn.active {
+  background: var(--zhu);
+  border-color: var(--zhu);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* 對戰打擊回饋：傷害飄字、震動、combo橫幅 */
+.battle-vs { position: relative; }
+.dmg-float {
+  position: absolute;
+  top: 0; left: 30px;
+  font-family: var(--font-brush);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--zhu);
+  pointer-events: none;
+  animation: dmgFloat .9s ease-out forwards;
+}
+.dmg-float.dmg-hurt { color: var(--yan); left: auto; right: 30px; }
+@keyframes dmgFloat {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-36px); }
+}
+
+.battle-card.shake { animation: battleShake .3s; }
+@keyframes battleShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-4px); }
+}
+
+.combo-banner {
+  position: fixed;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-brush);
+  font-size: 2rem;
+  color: var(--zhu);
+  text-shadow: 0 0 12px rgba(158,59,44,.4);
+  pointer-events: none;
+  z-index: 10;
+  animation: comboPop .9s ease-out forwards;
+}
+@keyframes comboPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  35% { transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
 @media (max-width: 480px) {

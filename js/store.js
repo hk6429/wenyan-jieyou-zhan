@@ -40,5 +40,22 @@ const WYStore = (() => {
     return Object.entries(state.texts).filter(([, v]) => v.mastered).map(([k]) => k);
   }
 
-  return { load, save, getTextState, recordAnswer, masteryRatio, allMastered };
+  // 每天首次開站呼叫一次：今天已記錄過就不動，昨天記錄過則連續天數+1，其他情況重置為1
+  function touchStreak() {
+    const state = load();
+    if (!state.streak) state.streak = { last: null, days: 0 };
+    const today = new Date().toISOString().slice(0, 10);
+    if (state.streak.last === today) return state.streak;
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    state.streak.days = state.streak.last === yesterday ? state.streak.days + 1 : 1;
+    state.streak.last = today;
+    save(state);
+    return state.streak;
+  }
+
+  function getStreak() {
+    return load().streak || { last: null, days: 0 };
+  }
+
+  return { load, save, getTextState, recordAnswer, masteryRatio, allMastered, touchStreak, getStreak };
 })();
