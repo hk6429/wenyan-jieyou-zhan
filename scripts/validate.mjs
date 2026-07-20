@@ -1,6 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const rootDir = join(__dirname, '..');
 
 const texts = JSON.parse(readFileSync(new URL('../data/texts.json', import.meta.url)));
+const battleSrc = readFileSync(join(rootDir, 'js/battle.js'), 'utf8');
 
 const VALID_LEVELS = new Set(['J', 'S']);
 const VALID_TYPES = new Set(['char', 'sentence', 'gist', 'theme']);
@@ -38,6 +44,24 @@ for (const t of texts) {
       if (!t.passage || !t.passage.includes(seg.text.slice(0, 4))) {
         warnings.push(`${tag} 第${seg.no}段開頭跟 passage 對不上，請人工確認是否為原文節錄`);
       }
+      if (!seg.translation) {
+        errors.push(`${tag} 第${seg.no}段缺少 translation 白話語譯`);
+      } else if (SIMPLIFIED_HINTS.test(seg.translation)) {
+        warnings.push(`${tag} 第${seg.no}段 translation 疑似含簡體字殘留`);
+      }
+      if (!Array.isArray(seg.glossary) || seg.glossary.length < 1) {
+        errors.push(`${tag} 第${seg.no}段缺少 glossary 字詞注釋`);
+      } else {
+        for (const g of seg.glossary) {
+          if (!g.word || !g.gloss) errors.push(`${tag} 第${seg.no}段 glossary 項目缺少 word/gloss`);
+          if (g.word && seg.text && !seg.text.includes(g.word)) {
+            warnings.push(`${tag} 第${seg.no}段 glossary「${g.word}」未出現在該段原文中，請確認`);
+          }
+        }
+      }
+      if (!seg.note) {
+        warnings.push(`${tag} 第${seg.no}段缺少 note 賞析`);
+      }
     }
   }
 
@@ -64,6 +88,20 @@ for (const t of texts) {
 
   if (t.passage && SIMPLIFIED_HINTS.test(t.passage)) {
     warnings.push(`${tag} passage 疑似含簡體字殘留，請人工複核`);
+  }
+}
+
+// battle.js ROSTER 覆蓋檢查：每篇文本都應該有對應的對戰對手
+const rosterUnlockTexts = new Set([...battleSrc.matchAll(/unlockText:\s*'(t\d\d)'/g)].map((m) => m[1]));
+for (const t of texts) {
+  if (t.id && !rosterUnlockTexts.has(t.id)) {
+    errors.push(`[${t.id} ${t.title}] 未出現在 battle.js 的 ROSTER 中（缺對戰對手）`);
+  }
+}
+const rosterImgs = [...battleSrc.matchAll(/img:\s*'([^']+)'/g)].map((m) => m[1]);
+for (const img of rosterImgs) {
+  if (!existsSync(join(rootDir, img))) {
+    errors.push(`battle.js ROSTER 引用的圖檔不存在：${img}`);
   }
 }
 

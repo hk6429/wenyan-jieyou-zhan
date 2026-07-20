@@ -31,7 +31,22 @@ page.on('pageerror', (err) => errors.push(String(err)));
 await page.goto('http://localhost:8099');
 await page.waitForSelector('.text-list-item');
 await page.click('.text-list-item');
-await page.waitForSelector('.passage');
+await page.waitForSelector('.segment-original');
+
+// 選文詳情頁：逐段三分頁（白話語譯/字詞注釋/賞析）切換測試
+const segTabCount = await page.locator('.seg-tabs').count();
+if (segTabCount < 1) errors.push('選文詳情頁沒有渲染出逐段三分頁（.seg-tabs）');
+for (const label of ['白話語譯', '字詞注釋', '賞析']) {
+  await page.click(`.seg-tabs >> nth=0 >> button:has-text("${label}")`);
+  await page.waitForTimeout(150);
+  const content = await page.locator('.seg-tab-content').first().innerText();
+  if (!content || content.includes('尚無')) errors.push(`第一段「${label}」分頁內容缺漏：${content}`);
+}
+const detailOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
+if (detailOverflow) errors.push('選文詳情頁在 390px 寬度發生橫向跑版');
+
+await page.click('#backToList');
+await page.waitForSelector('.text-list-item');
 
 for (const tab of ['flashcard', 'quiz', 'battle', 'wenhao']) {
   await page.click(`nav.tabs button[data-tab="${tab}"]`);
