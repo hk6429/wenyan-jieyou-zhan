@@ -1,0 +1,11 @@
+name = "wenyan-jieyou-zhan"
+pages_build_output_dir = "."
+compatibility_date = "2026-07-15"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 binding 名 wenyan_db（functions 內以 env.wenyan_db 取用）。
+# database_id 於 `wrangler d1 create wenyan-jieyou-zhan-db` 後填入（本機 --local 不需要）。
+[[d1_databases]]
+binding = "wenyan_db"
+database_name = "wenyan-jieyou-zhan-db"
+database_id = "e2797070-347e-435c-8c38-798ede7e229c"

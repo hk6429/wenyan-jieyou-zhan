@@ -1,0 +1,94 @@
+/* 文房市集樣式——沿用 main.css 宣紙／朱紅／墨色變數，手機 390px 不跑版。品階三色：凡品灰、良品青、珍品金。 */
+:root {
+  --mkt-g0:#8d8478; --mkt-g0-bg:rgba(141,132,120,.10);   /* 凡品 */
+  --mkt-g1:#3a5a6e; --mkt-g1-bg:rgba(58,90,110,.10);     /* 良品 */
+  --mkt-g2:#b3892f; --mkt-g2-bg:rgba(179,137,47,.12);    /* 珍品 */
+}
+.mkt-head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.mkt-sub { margin: 4px 0 0; font-size: .82rem; color: var(--ink-dan); line-height: 1.5; }
+.mkt-ink { font-size: .9rem; color: var(--ink-zhong); white-space: nowrap; }
+.mkt-ink strong { color: var(--zhu); font-size: 1.1rem; }
+.mkt-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+.mkt-idrow { font-size: .85rem; color: var(--ink-zhong); }
+.mkt-statusline { min-height: 0; font-size: .82rem; color: var(--dai); margin-top: 6px; transition: color .2s; }
+.mkt-statusline.mkt-flash { color: var(--zhu); font-weight: 700; }
+
+.mkt-badge { font-size: .78rem; padding: 3px 10px; border-radius: 20px; }
+.mkt-open { background: rgba(59,93,79,.14); color: var(--dai); }
+.mkt-closed { background: rgba(141,132,120,.14); color: var(--ink-dan); }
+
+.mkt-mini-btn { border: 1px solid var(--zhu); background: transparent; color: var(--zhu); border-radius: 6px; padding: 3px 10px; font-size: .78rem; cursor: pointer; font-family: var(--font-ui); }
+.mkt-mini-btn:hover { background: rgba(158,59,44,.08); }
+
+.mkt-rules summary { cursor: pointer; font-weight: 600; color: var(--ink-zhong); }
+.mkt-rule-list { margin: 10px 0 0; padding-left: 1.2em; font-size: .78rem; color: var(--ink-dan); line-height: 1.7; }
+.mkt-rule-list strong { color: var(--zhu); }
+
+.mkt-tabs, .mkt-subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.mkt-tab-btn, .mkt-subtab { border: 1px solid var(--line); background: var(--paper); color: var(--ink-zhong); border-radius: 8px; padding: 6px 12px; font-size: .82rem; cursor: pointer; font-family: var(--font-ui); }
+.mkt-tab-btn.active, .mkt-subtab.active { background: var(--zhu); color: #fff; border-color: var(--zhu); }
+
+.mkt-list { display: flex; flex-direction: column; gap: 10px; }
+.mkt-card { padding: 12px; border-left: 4px solid var(--mkt-g0); }
+.mkt-card.mkt-g0 { border-left-color: var(--mkt-g0); }
+.mkt-card.mkt-g1 { border-left-color: var(--mkt-g1); }
+.mkt-card.mkt-g2 { border-left-color: var(--mkt-g2); }
+.mkt-card-main { display: flex; align-items: center; gap: 12px; }
+.mkt-card-img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--paper-aged); flex: 0 0 auto; }
+.mkt-card-img.img-fallback { display: flex; align-items: center; justify-content: center; color: var(--zhu); font-family: var(--font-brush); }
+.mkt-card-img.img-fallback::after { content: '文'; font-size: 1.4rem; }
+.mkt-card-info { flex: 1; min-width: 0; }
+.mkt-card-name { font-size: 1rem; color: var(--ink-nong); }
+.mkt-card-sub { font-size: .78rem; color: var(--ink-dan); margin-top: 2px; }
+.mkt-card-seller { font-size: .76rem; color: var(--ink-dan); margin-top: 2px; }
+.mkt-card-price { font-size: 1.05rem; color: var(--zhu); font-weight: 700; white-space: nowrap; }
+.mkt-tier { font-size: .72rem; padding: 1px 7px; border-radius: 10px; }
+.mkt-tier-g0 { background: var(--mkt-g0-bg); color: var(--mkt-g0); }
+.mkt-tier-g1 { background: var(--mkt-g1-bg); color: var(--mkt-g1); }
+.mkt-tier-g2 { background: var(--mkt-g2-bg); color: var(--mkt-g2); }
+.mkt-buy-btn { margin-top: 10px; width: 100%; }
+.mkt-closed-hint { margin-top: 8px; font-size: .78rem; color: var(--ink-dan); text-align: center; }
+
+.mkt-empty, .mkt-guide, .mkt-loading, .mkt-offline { font-size: .88rem; color: var(--ink-dan); text-align: center; }
+.mkt-guide { color: var(--ink-zhong); }
+.mkt-guide .primary { margin-top: 10px; }
+
+.mkt-gear-summary { font-size: .86rem; color: var(--ink-zhong); }
+.mkt-gear-hint { font-size: .74rem; color: var(--ink-dan); margin-top: 6px; line-height: 1.5; }
+.mkt-equip-btn { border: 1px solid var(--dai); background: transparent; color: var(--dai); border-radius: 8px; padding: 6px 12px; font-size: .8rem; cursor: pointer; font-family: var(--font-ui); white-space: nowrap; }
+.mkt-equip-btn.on { background: var(--dai); color: #fff; }
+
+.mkt-sell-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 10px; }
+.mkt-sell-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); cursor: pointer; font-family: var(--font-ui); font-size: .8rem; }
+.mkt-sell-pick.mkt-g2 { border-color: var(--mkt-g2); }
+.mkt-sell-img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; background: var(--paper-aged); }
+.mkt-sell-img.img-fallback { display: flex; align-items: center; justify-content: center; color: var(--zhu); font-family: var(--font-brush); }
+.mkt-sell-img.img-fallback::after { content: '文'; }
+
+.mkt-form { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.mkt-form-row { font-size: .84rem; color: var(--ink-zhong); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mkt-form-row input[type=number], .mkt-form-row input:not([type]), .mkt-form-row select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--font-ui); font-size: .9rem; max-width: 100%; }
+.mkt-check { font-size: .82rem; }
+
+.mkt-mine-result { font-size: .82rem; color: var(--dai); margin-top: 8px; }
+.mkt-thanks-got { margin-top: 4px; color: var(--zhu); }
+
+.mkt-stars { margin: 8px 0 0; padding-left: 0; list-style: none; }
+.mkt-stars li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: .9rem; }
+.mkt-stars li.mkt-champ { color: var(--zhu); font-weight: 700; }
+.mkt-rank { width: 24px; text-align: center; color: var(--ink-dan); }
+.mkt-star-name { flex: 1; }
+.mkt-star-deals { font-size: .8rem; color: var(--ink-dan); }
+
+.mkt-dir { font-size: .74rem; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.mkt-dir-sold { background: rgba(158,59,44,.12); color: var(--zhu); }
+.mkt-dir-bought { background: rgba(59,93,79,.12); color: var(--dai); }
+
+/* 感謝小卡 / 設定身分 modal */
+.mkt-modal { position: fixed; inset: 0; background: rgba(26,22,19,.5); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.mkt-modal-box { background: var(--paper); border-radius: 14px; padding: 18px; max-width: 420px; width: 100%; box-shadow: var(--shadow-lift); max-height: 88vh; overflow-y: auto; }
+.mkt-modal-box h4 { margin: 0 0 12px; color: var(--ink-nong); }
+.mkt-cards { display: flex; flex-direction: column; gap: 8px; }
+.mkt-thanks { text-align: left; border: 1px solid var(--line); background: var(--paper-warm); color: var(--ink-zhong); border-radius: 8px; padding: 10px 12px; font-size: .86rem; cursor: pointer; font-family: var(--font-read); }
+.mkt-thanks:hover { border-color: var(--zhu); }
+.mkt-thanks-none { background: transparent; color: var(--ink-dan); font-family: var(--font-ui); }

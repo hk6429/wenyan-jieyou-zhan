@@ -1,0 +1,161 @@
+/* 解憂草堂：庭園養成視覺層。沿用 main.css 的墨階／宣紙變數。手機 390px 不橫向跑版。 */
+
+.ct-emoji { font-size: 1.8rem; line-height: 1; display: inline-block; }
+
+/* 概覽數字 */
+.ct-stat {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+.ct-stat > div { display: flex; flex-direction: column; gap: 2px; }
+.ct-stat-n { font-family: var(--font-brush); font-size: 1.6rem; color: var(--zhu); line-height: 1; }
+.ct-stat small { color: var(--ink-dan); font-size: .72rem; }
+
+/* 場景 */
+.ct-scene-card { padding: 0; overflow: hidden; }
+.ct-scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  min-height: 300px;
+  background: linear-gradient(180deg, #e9efe9 0%, #efe6d3 62%, #e6d9bf 100%);
+  touch-action: none;
+  overflow: hidden;
+}
+.ct-bg { position: absolute; inset: 0; z-index: 0; }
+.ct-bg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 對聯（左右直書） */
+.ct-couplet {
+  position: absolute;
+  top: 12%;
+  z-index: 4;
+  writing-mode: vertical-rl;
+  font-family: var(--font-brush);
+  font-size: clamp(.85rem, 3.4vw, 1.25rem);
+  letter-spacing: .12em;
+  color: var(--ink-nong);
+  background: linear-gradient(180deg, #b8412f, #8a2f22);
+  color: #fbe4c9;
+  padding: 10px 6px;
+  border-radius: 4px;
+  box-shadow: var(--shadow-paper);
+  max-height: 74%;
+}
+.ct-couplet--up { right: 3%; }
+.ct-couplet--down { left: 3%; }
+
+/* 山門 */
+.ct-gate-wrap { position: absolute; top: 6%; left: 50%; transform: translateX(-50%); z-index: 3; width: min(58%, 260px); }
+.ct-gate {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; background: none; border: 0; cursor: default; padding: 0;
+}
+.ct-gate-img { width: 100%; height: auto; max-height: 130px; object-fit: contain; }
+.ct-plaque {
+  font-family: var(--font-brush);
+  font-size: clamp(.8rem, 3vw, 1.05rem);
+  color: #fbe4c9;
+  background: linear-gradient(180deg, #4a2f1c, #2b1a10);
+  border: 1px solid #caa15f;
+  border-radius: 4px;
+  padding: 3px 12px;
+  max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ct-gate-rank { font-size: .72rem; color: var(--ink-zhong); background: rgba(247,242,231,.8); padding: 1px 8px; border-radius: 999px; }
+
+/* 三院落 */
+.ct-courts {
+  position: absolute; bottom: 3%; left: 0; right: 0; z-index: 3;
+  display: flex; justify-content: space-around; gap: 6px; padding: 0 6px;
+}
+.ct-court { flex: 1; min-width: 0; text-align: center; }
+.ct-court-img { width: 100%; height: 54px; object-fit: contain; }
+.ct-court-cap { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.ct-court-cap strong { font-size: .82rem; color: var(--ink-nong); }
+.ct-tier-badge { font-size: .66rem; color: #fff; background: var(--dai); padding: 0 6px; border-radius: 999px; }
+.ct-court--t0 .ct-tier-badge { background: var(--ink-dan); }
+.ct-court--t4 .ct-tier-badge { background: var(--zhu); }
+.ct-court-pct { font-size: .68rem; color: var(--ink-dan); }
+
+/* 進度條（院落＋成就共用） */
+.ct-progress { height: 5px; background: var(--ink-xi); border-radius: 999px; overflow: hidden; margin-top: 3px; }
+.ct-progress-fill { height: 100%; background: linear-gradient(90deg, var(--dai), var(--qing-shi-light)); border-radius: 999px; }
+
+/* 裝飾層 */
+.ct-decor-layer { position: absolute; inset: 0; z-index: 2; }
+.ct-decor {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 40px; height: 40px; cursor: grab; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.ct-decor img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.ct-decor.is-dragging { cursor: grabbing; filter: drop-shadow(0 4px 8px rgba(0,0,0,.3)); z-index: 5; }
+.ct-decor:focus-visible { outline: 2px solid var(--zhu); border-radius: 6px; }
+
+/* 名句題聯面板 */
+.ct-hint, .ct-empty { font-size: .8rem; color: var(--ink-dan); }
+.ct-field { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.ct-field > span { flex: 0 0 76px; font-size: .85rem; color: var(--ink-zhong); }
+.ct-field select {
+  flex: 1; min-width: 0; padding: 7px 8px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--paper); color: var(--ink-nong);
+  font-family: var(--font-read); font-size: .88rem;
+}
+.ct-lian-actions { display: flex; gap: 8px; margin-top: 6px; }
+.ct-msg { color: var(--zhu); font-size: .8rem; min-height: 1em; margin: 6px 0 0; }
+
+/* 掛軸牆 */
+.ct-scroll-wall { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ct-scroll {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 74px; padding: 10px 4px;
+  background: linear-gradient(180deg, #f3ead4, #e7d7b6);
+  border: 1px solid #caa15f; border-top: 4px solid #8a3d2a; border-radius: 3px;
+  box-shadow: var(--shadow-paper);
+}
+.ct-scroll-title { font-family: var(--font-brush); writing-mode: vertical-rl; font-size: .9rem; color: var(--ink-jiao); max-height: 88px; }
+.ct-scroll-author { font-size: .66rem; color: var(--ink-dan); }
+
+/* 成就牆 */
+.ct-ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 8px; }
+.ct-ach { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-warm); opacity: .7; }
+.ct-ach.is-on { opacity: 1; border-color: var(--zhu); background: #f6ece0; }
+.ct-ach-name { display: block; font-weight: 600; font-size: .86rem; color: var(--ink-nong); }
+.ct-ach-desc { display: block; font-size: .72rem; color: var(--ink-dan); margin: 2px 0 4px; }
+.ct-ach-num { font-size: .68rem; color: var(--ink-dan); }
+
+/* 工具列 */
+.ct-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ct-toolbar small { color: var(--ink-dan); font-size: .74rem; }
+
+/* 慶典動畫 */
+.ct-epic {
+  position: fixed; inset: 0; z-index: 999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(26,22,19,.42); backdrop-filter: blur(2px);
+  animation: ct-fade .3s ease;
+}
+.ct-epic-card {
+  text-align: center; padding: 26px 30px; border-radius: 14px;
+  background: linear-gradient(180deg, #fdf6e6, #f0e2c4);
+  border: 2px solid #caa15f; box-shadow: var(--shadow-lift);
+  animation: ct-pop .5s cubic-bezier(.2,1.3,.4,1);
+  max-width: 86vw;
+}
+.ct-epic-title { font-family: var(--font-brush); font-size: 1.6rem; color: var(--zhu); }
+.ct-epic-text { margin-top: 8px; color: var(--ink-zhong); font-family: var(--font-read); }
+@keyframes ct-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ct-pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* 窄螢幕微調（390px 不橫向跑版） */
+@media (max-width: 430px) {
+  .ct-stat-n { font-size: 1.35rem; }
+  .ct-court-cap strong { font-size: .74rem; }
+  .ct-field > span { flex-basis: 60px; }
+  .ct-decor { width: 34px; height: 34px; }
+  .ct-scroll { width: 64px; }
+}

@@ -40,6 +40,10 @@ async function boot() {
   WYQuiz.init(TEXTS);
   WYWenhao.init(TEXTS);
   WYStore.touchStreak();
+  WYCaotang.init(TEXTS);
+  WYFusion.init(TEXTS);
+  WYRt.init(TEXTS);
+  WYMarket.init(TEXTS);
   renderTab('list');
 }
 
@@ -57,6 +61,10 @@ function renderTab(tab) {
   if (tab === 'quiz') return renderQuiz();
   if (tab === 'battle') return renderBattle();
   if (tab === 'wenhao') return renderWenhao();
+  if (tab === 'caotang') return WYCaotang.render(app);
+  if (tab === 'fusion') return WYFusion.render(app);
+  if (tab === 'rt') return WYRt.render(app);
+  if (tab === 'market') return WYMarket.render(app);
 }
 
 function renderList() {
@@ -293,10 +301,35 @@ function drawBattle() {
   app.querySelectorAll('.options button').forEach((btn) => {
     btn.addEventListener('click', () => {
       const isCorrect = Number(btn.dataset.i) === q.answerIdx;
+      const wasMastered = WYStore.getTextState(currentTextId).mastered;
       WYStore.recordAnswer(currentTextId, isCorrect);
       const beforeOpponentHp = currentBattle.opponent.curHp;
       const beforePlayerHp = currentBattle.player.curHp;
+      // 隨行文魄＋文房裝備加成（無隨行/無裝備時皆回中性值 0/false/1，行為與原本一致）
+      const shielded = !isCorrect && WYFusionAdapter.tryShield(currentBattle);
       currentBattle = WYBattle.resolveAnswer(currentBattle, isCorrect);
+      if (isCorrect) {
+        const bonus = WYFusionAdapter.damageBonus() + WYMarketAdapter.damageBonus();
+        if (bonus > 0) currentBattle.opponent.curHp = Math.max(0, currentBattle.opponent.curHp - bonus);
+        const inkExtra = (WYFusionAdapter.inkMultiplier() - 1) + (WYMarketAdapter.inkMultiplier() - 1);
+        const inkBonus = Math.round(2 * inkExtra);
+        if (inkBonus > 0) WYStore.addInk(inkBonus);
+        // 精通里程碑（false→true）必掉一件文房道具
+        if (!wasMastered && WYStore.getTextState(currentTextId).mastered) {
+          const g = WYMarketStore.rollDrop({ event: 'mastery' });
+          if (g) WYMarketStore.addOwned(g);
+        }
+      } else if (shielded) {
+        currentBattle.player.curHp = beforePlayerHp; // 護心文魄：免此次反擊
+        currentBattle.log.push('隨行文魄護體，免去一次反擊');
+      }
+      currentBattle.win = currentBattle.opponent.curHp <= 0;
+      currentBattle.finished = currentBattle.opponent.curHp <= 0 || currentBattle.player.curHp <= 0;
+      // 對戰勝利機率掉落文房道具
+      if (currentBattle.win) {
+        const g = WYMarketStore.rollDrop({ event: 'battleWin', combo: currentBattle.combo });
+        if (g) WYMarketStore.addOwned(g);
+      }
       const dmg = isCorrect ? beforeOpponentHp - currentBattle.opponent.curHp : beforePlayerHp - currentBattle.player.curHp;
       isCorrect ? WYSound.correct() : WYSound.wrong();
       if (currentBattle.comboMilestone) WYSound.combo();

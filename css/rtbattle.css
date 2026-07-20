@@ -1,0 +1,124 @@
+/* 文戰擂台樣式：沿用 main.css 的水墨變數（--ink-* / --paper* / --zhu / --qing-shi / --dai）。
+   手機 390px 不跑版：所有橫向內容用 flex-wrap 或縮放，房號大字用 clamp。 */
+.rt { max-width: 640px; margin: 0 auto; }
+
+.rt-hero { text-align: center; }
+.rt-hero h2 { font-family: var(--font-brush); color: var(--zhu); margin: 0 0 .3em; }
+.rt-sub { font-size: .82rem; color: var(--ink-dan); line-height: 1.6; }
+
+.rt-menu { display: grid; gap: .6rem; margin-top: 1rem; }
+.rt-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  width: 100%; text-align: left;
+  padding: .8rem 1rem; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--paper); color: var(--ink-nong); font-family: var(--font-ui);
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.rt-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-paper); border-color: var(--ink-qing); }
+.rt-btn span { font-size: .74rem; font-weight: 400; color: var(--ink-dan); }
+.rt-btn--main { background: var(--zhu); color: #fff; border-color: var(--zhu); }
+.rt-btn--main span { color: rgba(255,255,255,.85); }
+.rt-btn--main:hover { background: var(--zhu-light); }
+
+.rt-back {
+  background: none; border: none; color: var(--qing-shi); cursor: pointer;
+  font-size: .9rem; padding: .3rem 0 .6rem; font-family: var(--font-ui);
+}
+.rt-back:hover { color: var(--zhu); }
+
+.rt-input {
+  width: 100%; box-sizing: border-box; margin: .5rem 0;
+  padding: .7rem .9rem; border: 1px solid var(--line); border-radius: 10px;
+  font-size: 1.1rem; font-family: var(--font-ui); background: var(--paper);
+  color: var(--ink-nong); text-align: center; letter-spacing: .08em;
+}
+.rt-input:focus { outline: 2px solid var(--qing-shi-light); border-color: var(--qing-shi); }
+
+.rt-scope { display: grid; gap: .4rem; margin: .6rem 0; font-size: .9rem; }
+.rt-scope label { display: flex; align-items: center; gap: .4rem; }
+.rt-single { padding: .35rem .5rem; border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-ui); max-width: 100%; }
+.rt-scope-line { font-size: .9rem; margin: .5rem 0; }
+.rt-scope-line select, .rt-host select { padding: .3rem .5rem; border: 1px solid var(--line); border-radius: 8px; }
+
+/* 大字房號 */
+.rt-lobby, .rt-host { text-align: center; }
+.rt-code {
+  font-family: var(--font-brush);
+  font-size: clamp(2.6rem, 16vw, 4.2rem); letter-spacing: .18em;
+  text-align: center; font-weight: 700; color: var(--zhu);
+  margin: .3em 0; word-break: break-all;
+}
+.rt-waiting { color: var(--dai); font-size: .95rem; margin-top: .6rem; }
+.rt-loading { text-align: center; color: var(--ink-dan); padding: 1.4rem; }
+
+/* 對戰血條 HUD */
+.rt-hud { display: flex; align-items: center; gap: .5rem; margin-bottom: .8rem; }
+.rt-side { flex: 1; min-width: 0; }
+.rt-name { font-size: .82rem; font-weight: 700; color: var(--ink-zhong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-opp { text-align: right; }
+.rt-hpbar { height: 12px; background: var(--paper-aged); border-radius: 6px; overflow: hidden; margin: .2rem 0; }
+.rt-hpbar span { display: block; height: 100%; background: linear-gradient(90deg, var(--dai), #5a8a6e); transition: width .4s ease; }
+.rt-hpbar--opp span { background: linear-gradient(90deg, var(--yan), var(--zhu-light)); }
+.rt-hpn { font-size: .72rem; color: var(--ink-dan); }
+.rt-vs { font-size: .72rem; color: var(--ink-dan); white-space: nowrap; text-align: center; }
+.rt-hud--solo { flex-direction: column; text-align: center; }
+
+/* 題目卡 */
+.rt-qtype { display: inline-block; font-size: .72rem; padding: .12rem .55rem; border-radius: 999px; background: var(--qing-shi); color: #fff; margin-bottom: .5rem; }
+.rt-stem { font-family: var(--font-read); font-size: 1.15rem; line-height: 1.7; color: var(--ink-jiao); margin-bottom: .9rem; }
+.rt-opts { display: grid; gap: .5rem; }
+.rt-opt {
+  width: 100%; box-sizing: border-box; text-align: left;
+  padding: .7rem .9rem; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--paper); color: var(--ink-nong); font-family: var(--font-read);
+  font-size: 1rem; cursor: pointer; transition: background .12s, border-color .12s;
+}
+.rt-opt:hover:not(:disabled) { background: var(--paper-warm); border-color: var(--ink-qing); }
+.rt-opt:disabled { cursor: default; }
+.rt-opt--right { background: #dff0e3; border-color: var(--dai); color: var(--dai); font-weight: 700; }
+.rt-opt--wrong { background: #f6e0dc; border-color: var(--zhu); color: var(--zhu); }
+.rt-opt--gone { opacity: .35; text-decoration: line-through; }
+
+/* 硯靈事件 */
+.rt-omen { margin-top: .7rem; min-height: 0; }
+.rt-yanling {
+  font-family: var(--font-read); font-size: .86rem; line-height: 1.6;
+  padding: .6rem .8rem; border-left: 3px solid var(--zhu);
+  background: linear-gradient(90deg, rgba(158,59,44,.08), transparent);
+  color: var(--yan); border-radius: 0 8px 8px 0;
+  animation: rt-omen-in .35s ease;
+}
+@keyframes rt-omen-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+
+/* 結算 / 榜 */
+.rt-result { text-align: center; }
+.rt-result h2 { font-family: var(--font-brush); margin: .2em 0 .4em; }
+.rt-result--win h2 { color: var(--zhu); }
+.rt-result--lose h2 { color: var(--qing-shi); }
+.rt-score { font-size: 1.1rem; font-weight: 700; color: var(--ink-zhong); margin-bottom: .5rem; }
+.rt-title-badge {
+  display: inline-block; margin: .3rem 0; padding: .3rem .9rem;
+  border-radius: 999px; background: var(--paper-aged); color: var(--ink-jiao);
+  font-weight: 700; font-size: .9rem; border: 1px solid var(--ink-qing);
+}
+.rt-result-btns { display: grid; gap: .5rem; margin-top: 1rem; }
+.rt-chcode, .rt-chcode { font-family: var(--font-brush); color: var(--zhu); font-size: 1.2rem; letter-spacing: .1em; }
+
+.rt-board { display: grid; gap: .35rem; margin: .8rem 0; text-align: left; }
+.rt-board-row { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.rt-board-row span:first-child { width: 1.8rem; text-align: center; }
+.rt-board-row b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-board-row span:last-child { color: var(--ink-dan); font-size: .85rem; }
+
+.rt-herald { font-family: var(--font-read); line-height: 1.9; margin: .8rem 0; padding: .8rem 1rem; background: var(--paper-warm); border-radius: 10px; color: var(--ink-jiao); }
+.rt-host-state { margin: .6rem 0; font-size: .95rem; color: var(--dai); font-weight: 600; }
+
+.rt-err, .rt-err-card h3 { color: var(--zhu); font-size: .88rem; margin-top: .5rem; }
+.rt-degrade h3 { color: var(--qing-shi); }
+.rt-degrade p { font-size: .9rem; line-height: 1.7; }
+
+@media (max-width: 400px) {
+  .rt-vs { font-size: .66rem; }
+  .rt-btn { font-size: .95rem; }
+}
