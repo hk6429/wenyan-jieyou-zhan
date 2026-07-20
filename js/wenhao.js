@@ -3,6 +3,13 @@
 const WYWenhao = (() => {
   let texts = [];
 
+  const PORTRAIT = {
+    t01: 'assets/characters/zhuge_home.png',
+    t02: 'assets/characters/taoyuanming.png',
+    t03: 'assets/characters/zhuzhiwu.png',
+    t04: 'assets/characters/zhuge_war.png',
+  };
+
   function init(allTexts) {
     texts = allTexts;
   }
@@ -19,6 +26,7 @@ const WYWenhao = (() => {
         genre: t.genre,
         unlocked: st.mastered,
         progress: st.total > 0 ? Math.round(ratio * 100) : 0,
+        img: PORTRAIT[t.id] || '',
       };
     });
   }

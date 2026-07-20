@@ -3,10 +3,10 @@ const WYBattle = (() => {
 
   // 文豪錄：PvE 對手，難度=每次攻擊傷害越高，越難被玩家 combo 壓制
   const ROSTER = [
-    { id: 'zhuge', name: '誡子丞相', hp: MAX_HP, atk: 6, unlockText: 't01' },
-    { id: 'taoyuanming', name: '靖節先生', hp: MAX_HP, atk: 7, unlockText: 't02' },
-    { id: 'zhuzhiwu', name: '燭大夫', hp: MAX_HP, atk: 8, unlockText: 't03' },
-    { id: 'zhuge_chushi', name: '武侯出師', hp: MAX_HP, atk: 9, unlockText: 't04' },
+    { id: 'zhuge', name: '誡子丞相', hp: MAX_HP, atk: 6, unlockText: 't01', img: 'assets/characters/zhuge_home.png' },
+    { id: 'taoyuanming', name: '靖節先生', hp: MAX_HP, atk: 7, unlockText: 't02', img: 'assets/characters/taoyuanming.png' },
+    { id: 'zhuzhiwu', name: '燭大夫', hp: MAX_HP, atk: 8, unlockText: 't03', img: 'assets/characters/zhuzhiwu.png' },
+    { id: 'zhuge_chushi', name: '武侯出師', hp: MAX_HP, atk: 9, unlockText: 't04', img: 'assets/characters/zhuge_war.png' },
   ];
 
   function newBattle(opponentId) {
