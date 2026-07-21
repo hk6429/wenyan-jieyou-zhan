@@ -51,7 +51,7 @@ const WYMarket = (() => {
         </ul>
       </details>
       <div class="mkt-tabs" id="mkt-tabs">
-        ${tabBtn('browse', '逛市集')}${tabBtn('gear', '我的文房')}${tabBtn('sell', '我要上架')}${tabBtn('mine', '我的掛單')}${tabBtn('stars', '集市達人')}${tabBtn('ever', '曾經持有')}
+        ${tabBtn('yanling', '硯靈行商')}${tabBtn('browse', '逛市集')}${tabBtn('gear', '我的文房')}${tabBtn('sell', '我要上架')}${tabBtn('mine', '我的掛單')}${tabBtn('stars', '集市達人')}${tabBtn('ever', '曾經持有')}
       </div>
       <div id="mkt-body"></div>`;
 
@@ -70,6 +70,8 @@ const WYMarket = (() => {
     const body = document.getElementById('mkt-body');
     const cc = WYStore.getClassCode();
     const nick = S().getNick();
+    // 硯靈行商不需班級碼／道號，單機玩家也能買基礎文房；放在身分關卡之前。
+    if (tab === 'yanling') return drawYanling(body);
     if (!cc || !nick) {
       body.innerHTML = needIdentity();
       document.getElementById('mkt-go-setid').onclick = editIdentity;
@@ -299,6 +301,39 @@ const WYMarket = (() => {
             <div class="mkt-card-sub">${line}　${when}</div></div>
           <span class="mkt-dir mkt-dir-${e.dir}">${e.dir === 'sold' ? '售出' : '購入'}</span></div></div>`;
       }).join('')}</div></div>`;
+  }
+
+  // —— 硯靈行商（NPC 直購，不需班級碼、每日皆可）——
+  function drawYanling(body) {
+    const stock = S().yanlingStock();
+    const price = S().YANLING_PRICE;
+    body.innerHTML = `
+      <div class="card mkt-yanling-head">
+        <p class="mkt-sub">🖋️ 硯靈平日擺攤，只賣「凡品」四寶，每件 <strong>${price}</strong> 🪶 墨錠，隨買隨得。想要良品／珍品，週末找同窗交易。</p>
+      </div>
+      <div class="mkt-list">
+        ${stock.map((g) => `
+          <div class="card mkt-card">
+            <div class="mkt-card-main">${imgTag(g.img, g.name, 'mkt-card-img')}
+              <div class="mkt-card-info">
+                <strong class="mkt-card-name">${esc(g.name)}</strong>
+                <div class="mkt-card-sub">${esc(g.catLabel)}・凡品　${esc(g.desc)}</div>
+              </div>
+              <button class="primary mkt-buy-btn" data-yl="${esc(g.id)}">${price} 🪶 購入</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+    body.querySelectorAll('.mkt-buy-btn[data-yl]').forEach((b) => {
+      b.onclick = () => {
+        const id = b.dataset.yl;
+        if (!S().GEAR_BY_ID[id]) return toast('查無此物');
+        if (!WYStore.spendInk(price)) return toast('墨錠不足');
+        S().addOwned(id);
+        S().recordEverOwned({ gearId: id, dir: 'buy', peer: '硯靈行商' });
+        toast(`購入 ${S().GEAR_BY_ID[id].name}！`);
+        draw();
+      };
+    });
   }
 
   // —— 設定班級與道號 ——

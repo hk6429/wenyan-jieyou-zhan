@@ -114,6 +114,10 @@ if (errors.length) {
   console.log(`\n❌ 錯誤 ${errors.length} 則：`);
   errors.forEach((e) => console.log(' -', e));
   process.exit(1);
+} else if (warnings.length) {
+  // 有警告不再宣稱 ALL CLEAN——避免「glossary 詞非原文子字串」這類警告被當雜訊放行，
+  // 掩蓋真正的原文錯字（曾漏掉 t17 玉玦、t16 駃騠 兩處硬傷）。警告須逐條人工確認。
+  console.log(`\n🟡 結構驗證通過，但有 ${warnings.length} 則警告待人工確認（非 ALL CLEAN）。`);
 } else {
   console.log('\n✅ 全部通過驗證（ALL CLEAN）。');
 }

@@ -504,7 +504,68 @@ button.primary:active { transform: scale(.97); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
+/* ── 改版新增：墨錠 HUD／飄字／引導卡／儀表板／硯靈行商 ── */
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ink-hud {
+  position: relative;
+  font-family: var(--font-brush);
+  font-size: 1.15rem;
+  color: var(--zhu);
+  background: rgba(158,59,44,.08);
+  border: 1px solid var(--ink-xi);
+  border-radius: 999px;
+  padding: 4px 14px;
+  white-space: nowrap;
+}
+.ink-float {
+  position: absolute;
+  top: -4px; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-brush);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--zhu);
+  pointer-events: none;
+  z-index: 5;
+  animation: dmgFloat .95s ease-out forwards;
+}
+.options button { position: relative; }
+.ink-cap-note { color: var(--ink-dan); font-size: .82rem; }
+
+.tab-sep { display: inline-block; width: 1px; align-self: center; height: 18px; background: var(--ink-xi); margin: 0 2px; }
+
+.guide-card { border-left: 4px solid var(--zhu); position: relative; }
+.guide-card h3 { margin: 0 0 6px; color: var(--ink-jiao); }
+.guide-steps { margin: 0; padding-left: 20px; line-height: 1.9; }
+.guide-more { margin: 8px 0 0; font-size: .85rem; color: var(--ink-dan); }
+.guide-close {
+  position: absolute; top: 8px; right: 10px;
+  border: none; background: none; font-size: 1.3rem; line-height: 1;
+  color: var(--ink-dan); cursor: pointer;
+}
+
+.dash-card summary { cursor: pointer; font-weight: 500; color: var(--ink-zhong); }
+.dash-card summary small { color: var(--ink-dan); font-weight: 400; }
+.dash-body { margin-top: 10px; }
+.dash-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.dash-type { flex: 0 0 4.5em; font-size: .9rem; color: var(--ink-zhong); }
+.dash-track { flex: 1; height: 10px; background: var(--ink-xi); border-radius: 6px; overflow: hidden; }
+.dash-fill { display: block; height: 100%; border-radius: 6px; }
+.dash-fill.dash-good { background: #4a7c59; }
+.dash-fill.dash-mid  { background: #c89b3c; }
+.dash-fill.dash-low  { background: var(--zhu); }
+.dash-fill.dash-na   { background: var(--ink-qing); }
+.dash-num { flex: 0 0 auto; font-size: .82rem; color: var(--ink-zhong); min-width: 5.5em; text-align: right; }
+.dash-num small { color: var(--ink-dan); }
+.dash-advice { margin: 10px 0 4px; font-size: .88rem; color: var(--ink-zhong); }
+.dash-parent { margin-top: 8px; }
+.dash-parent summary { cursor: pointer; font-size: .85rem; color: var(--zhu); }
+.dash-parent p { font-size: .85rem; line-height: 1.75; color: var(--ink-zhong); margin: 8px 0 0; }
+
+.mkt-yanling-head .mkt-sub { margin: 0; }
+
 @media (max-width: 480px) {
   main { padding: 10px; }
   header h1 { font-size: 1.6rem; }
+  .ink-hud { font-size: 1rem; padding: 3px 11px; }
 }

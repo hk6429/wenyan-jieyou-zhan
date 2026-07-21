@@ -15,8 +15,13 @@
 </head>
 <body>
 <header>
-  <h1>文言解憂站</h1>
-  <p>國中·高中文言文閱讀理解練功站</p>
+  <div class="header-row">
+    <div>
+      <h1>文言解憂站</h1>
+      <p>國中·高中文言文閱讀理解練功站</p>
+    </div>
+    <div id="ink-hud" class="ink-hud" title="墨錠：答對可得，用於合契與市集">🪶 <span id="ink-count">0</span></div>
+  </div>
 </header>
 
 <nav class="tabs">
@@ -24,11 +29,12 @@
   <button data-tab="flashcard">閃卡</button>
   <button data-tab="quiz">自測</button>
   <button data-tab="battle">對戰</button>
+  <button data-tab="wenhao">文豪錄</button>
+  <span class="tab-sep" aria-hidden="true"></span>
+  <button data-tab="caotang">草堂</button>
   <button data-tab="rt">擂台</button>
   <button data-tab="fusion">合契</button>
   <button data-tab="market">市集</button>
-  <button data-tab="wenhao">文豪錄</button>
-  <button data-tab="caotang">草堂</button>
 </nav>
 
 <main id="app"></main>

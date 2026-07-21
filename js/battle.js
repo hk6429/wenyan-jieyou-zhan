@@ -65,9 +65,12 @@ const WYBattle = (() => {
     };
   }
 
+  // 前兩位對手（誡子丞相／靖節先生，攻擊最低）一律開放，讓新玩家第一分鐘就能體驗連擊與戰鬥爽感；
+  // 其餘仍需對應篇目答對率達 80% 才解鎖，維持「讀懂才變強」的學習掛鉤。
+  const FREE_UNLOCK = 2;
   function unlockedRoster() {
     const mastered = new Set(WYStore.allMastered());
-    return ROSTER.map((r) => ({ ...r, unlocked: mastered.has(r.unlockText) }));
+    return ROSTER.map((r, i) => ({ ...r, unlocked: i < FREE_UNLOCK || mastered.has(r.unlockText) }));
   }
 
   return { ROSTER, newBattle, resolveAnswer, unlockedRoster };

@@ -62,7 +62,14 @@ const WYMarketStore = (() => {
     return fri.toISOString().slice(0, 10);
   }
   function nextOpenText(nowMs = Date.now()) {
-    return isMarketOpen(nowMs) ? '開市中' : '週五 16:00 開市（平日僅供瀏覽）';
+    return isMarketOpen(nowMs) ? '開市中' : '週五 16:00 開市（平日可找硯靈行商）';
+  }
+
+  // —— 硯靈行商（NPC 直購）——：不需班級碼、每日皆可，只賣「凡品」四寶當基礎道具來源，
+  // 讓單機玩家平日也有地方花墨錠；珍稀道具仍留給週末同窗交易。金流（扣墨錠）仍由 UI 層走 WYStore，本層不碰。
+  const YANLING_PRICE = 60;
+  function yanlingStock() {
+    return GEAR.filter((g) => tierOf(g.id) === 'fan').map((g) => ({ id: g.id, name: g.name, cat: g.cat, catLabel: CAT_LABEL[g.cat], img: g.img, desc: g.desc, price: YANLING_PRICE }));
   }
 
   // —— 掉落規則（資料結構＋純函式；實際接點在整合筆記說明，主線程於對戰勝利／精通里程碑呼叫）——
@@ -166,8 +173,8 @@ const WYMarketStore = (() => {
   function setNick(n) { const v = String(n || '').trim().slice(0, 12); if (v) _set(K_NICK, v); return v; }
 
   return {
-    GEAR, GEAR_BY_ID, CAT_LABEL, TIER_OF_PRICE, TIER_LABEL, TIER_GRADE, PRICE_BAND, THANKS_CARDS, DAILY_BUY_CAP, DROP_RULE, EQUIP_MAX,
-    tierOf, bandOf, isMarketOpen, weekKey, nextOpenText, rollDrop,
+    GEAR, GEAR_BY_ID, CAT_LABEL, TIER_OF_PRICE, TIER_LABEL, TIER_GRADE, PRICE_BAND, THANKS_CARDS, DAILY_BUY_CAP, DROP_RULE, EQUIP_MAX, YANLING_PRICE,
+    tierOf, bandOf, isMarketOpen, weekKey, nextOpenText, rollDrop, yanlingStock,
     setStorageBackend, loadGear, saveGear, ownedGear, sellableGear, addOwned, removeOwned, isEquipped, toggleEquip, gearMods, activeGearMods,
     getClaims, addClaim, removeClaim, buysToday, bumpBuys, getEverOwned, recordEverOwned, getNick, setNick,
   };

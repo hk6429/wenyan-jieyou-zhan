@@ -3,6 +3,7 @@ let currentTextId = null;
 let currentQuiz = null;
 let currentQIdx = 0;
 let currentQuizType = null;
+let currentQuizCombo = 0;
 let currentBattle = null;
 let segTabPreference = 'translation';
 
@@ -33,6 +34,24 @@ const WYSound = (() => {
   };
 })();
 
+// header 常駐墨錠計數器：任何得到/花費墨錠的動作後呼叫，讓玩家隨時看得到餘額
+function updateInkHud() {
+  const el = document.getElementById('ink-count');
+  if (el) el.textContent = WYStore.getInk();
+}
+
+// 墨錠飄字（沿用戰鬥浮字語彙，附在指定元素上；elOrSel 可為元素或選擇器，預設 header 計數器）
+function floatInk(amount, elOrSel) {
+  if (!amount) return;
+  const anchor = typeof elOrSel === 'string' ? document.querySelector(elOrSel) : (elOrSel || document.getElementById('ink-hud'));
+  if (!anchor) return;
+  const f = document.createElement('span');
+  f.className = 'ink-float';
+  f.textContent = `+${amount}🪶`;
+  anchor.appendChild(f);
+  setTimeout(() => f.remove(), 1000);
+}
+
 async function boot() {
   const res = await fetch('data/texts.json');
   TEXTS = await res.json();
@@ -44,6 +63,7 @@ async function boot() {
   WYFusion.init(TEXTS);
   WYRt.init(TEXTS);
   WYMarket.init(TEXTS);
+  updateInkHud();
   renderTab('list');
 }
 
@@ -56,6 +76,7 @@ tabButtons.forEach((btn) => {
 });
 
 function renderTab(tab) {
+  updateInkHud();
   if (tab === 'list') return renderList();
   if (tab === 'flashcard') return renderFlashcard();
   if (tab === 'quiz') return renderQuiz();
@@ -72,7 +93,20 @@ function renderList() {
   const streakHtml = streak.days > 0
     ? `<div class="card streak-banner">🔥 連續學習 ${streak.days} 天</div>`
     : '';
-  app.innerHTML = streakHtml + TEXTS.map((t) => {
+  let guideSeen = true;
+  try { guideSeen = !!localStorage.getItem('wy_guide_seen'); } catch { /* 隱私模式：當作已看過 */ }
+  const guideHtml = guideSeen ? '' : `
+    <div class="card guide-card" id="guideCard">
+      <button class="guide-close" id="guideClose" aria-label="關閉">×</button>
+      <h3>怎麼玩？三步驟</h3>
+      <ol class="guide-steps">
+        <li><b>讀一篇</b>：點下面任一篇，看原文＋白話語譯＋注釋賞析。</li>
+        <li><b>去「自測」練到精通</b>：答對就賺 🪶 墨錠，答對率達 80% 就精通。</li>
+        <li><b>「對戰」解鎖文豪</b>：前兩位對手一開始就能打，精通更多篇解鎖後面的高手。</li>
+      </ol>
+      <p class="guide-more">行有餘力再逛：草堂掛名句、擂台約同學對戰、合契收文魄、市集換文房四寶。</p>
+    </div>`;
+  app.innerHTML = streakHtml + guideHtml + renderDashboard() + TEXTS.map((t) => {
     const ratio = Math.round(WYStore.masteryRatio(t.id) * 100);
     return `
       <div class="card text-list-item" data-id="${t.id}">
@@ -83,6 +117,12 @@ function renderList() {
         <span class="badge">${t.level === 'J' ? '國中' : '高中'}·${ratio}%</span>
       </div>`;
   }).join('');
+  const gc = document.getElementById('guideClose');
+  if (gc) gc.onclick = () => {
+    try { localStorage.setItem('wy_guide_seen', '1'); } catch { /* 隱私模式：略過 */ }
+    const card = document.getElementById('guideCard');
+    if (card) card.remove();
+  };
   app.querySelectorAll('.text-list-item').forEach((el) => {
     el.addEventListener('click', () => {
       currentTextId = el.dataset.id;
@@ -96,6 +136,41 @@ const SEG_TABS = [
   { key: 'glossary', label: '字詞注釋' },
   { key: 'note', label: '賞析' },
 ];
+
+const TYPE_LABEL = { char: '字義', sentence: '句義', gist: '段旨', theme: '篇章文意' };
+
+// 學習儀表板：逐題型正確率＋精通篇數，讓學生看到弱點、家長/老師看得懂學了什麼（教育專家審查要求）
+function renderDashboard() {
+  const stats = WYStore.typeStats();
+  const answered = stats.reduce((s, x) => s + x.total, 0);
+  const masteredCount = WYStore.allMastered().length;
+  if (answered === 0) return ''; // 還沒作答就不佔版面
+  const weakest = stats.filter((x) => x.total >= 3).sort((a, b) => a.ratio - b.ratio)[0];
+  const bars = stats.map((x) => {
+    const pct = x.total ? Math.round(x.ratio * 100) : 0;
+    const cls = x.total < 3 ? 'dash-na' : x.ratio >= 0.8 ? 'dash-good' : x.ratio >= 0.6 ? 'dash-mid' : 'dash-low';
+    return `<div class="dash-row">
+      <span class="dash-type">${TYPE_LABEL[x.type]}</span>
+      <span class="dash-track"><span class="dash-fill ${cls}" style="width:${pct}%"></span></span>
+      <span class="dash-num">${x.total ? pct + '%' : '—'}<small>（${x.correct}/${x.total}）</small></span>
+    </div>`;
+  }).join('');
+  const weakLine = weakest && weakest.ratio < 0.8
+    ? `<p class="dash-advice">💡 目前「${TYPE_LABEL[weakest.type]}」較弱（${Math.round(weakest.ratio * 100)}%），到「自測」上方切到該題型多練幾題。</p>`
+    : (answered >= 8 ? '<p class="dash-advice">👍 各題型都在水準上，繼續保持！</p>' : '');
+  return `
+    <details class="card dash-card">
+      <summary>📊 我的學習儀表板　<small>已精通 ${masteredCount}/27 篇・答題 ${answered} 次</small></summary>
+      <div class="dash-body">
+        ${bars}
+        ${weakLine}
+        <details class="dash-parent">
+          <summary>給家長／老師看</summary>
+          <p>孩子在做的是「文言文閱讀理解」四種能力的練習：<b>字義</b>（讀懂關鍵字詞）、<b>句義</b>（翻譯理解句子）、<b>段旨</b>（抓每段重點）、<b>篇章文意</b>（掌握全篇主旨）。上面的百分比就是每種能力的答對率，越低代表越需要加強。「精通」＝某篇答對率達 80%（至少答 8 題），不是點幾下就算學會。獎勵（墨錠、對手解鎖、草堂掛軸）全部要真的答對才拿得到，且每日賺取墨錠有上限，避免變成刷數值。</p>
+        </details>
+      </div>
+    </details>`;
+}
 
 function renderTextDetail(t) {
   app.innerHTML = `
@@ -198,6 +273,7 @@ function renderQuiz() {
   if (!currentTextId) currentTextId = TEXTS[0]?.id;
   currentQuiz = WYQuiz.buildQuiz(currentTextId, { type: currentQuizType });
   currentQIdx = 0;
+  currentQuizCombo = 0;
   drawQuiz();
 }
 
@@ -229,19 +305,43 @@ function drawQuiz() {
     btn.addEventListener('click', () => {
       const i = Number(btn.dataset.i);
       const isCorrect = i === q.answerIdx;
-      isCorrect ? WYSound.correct() : WYSound.wrong();
+      const clicked = app.querySelectorAll('.options button')[i];
       app.querySelectorAll('.options button').forEach((b, bi) => {
         b.disabled = true;
         if (bi === q.answerIdx) b.classList.add('correct');
         else if (bi === i) b.classList.add('wrong');
       });
-      WYStore.recordAnswer(currentQuiz.textId, isCorrect);
+      const inkBefore = WYStore.getInk();
+      WYStore.recordAnswer(currentQuiz.textId, isCorrect, q.type);
+      const inkGain = WYStore.getInk() - inkBefore;
+      updateInkHud();
+      if (isCorrect) {
+        currentQuizCombo += 1;
+        WYSound.correct();
+        if (inkGain > 0) floatInk(inkGain, clicked);
+        if (currentQuizCombo >= 3 && currentQuizCombo % 3 === 0) {
+          WYSound.combo();
+          showQuizCombo(currentQuizCombo);
+        }
+      } else {
+        currentQuizCombo = 0;
+        WYSound.wrong();
+      }
+      const capNote = (isCorrect && inkGain === 0) ? '<span class="ink-cap-note">（今日墨錠已達上限，明天再賺）</span>' : '';
       document.getElementById('feedback').innerHTML = `
-        <p style="margin-top:8px;">${isCorrect ? '✅ 答對了！' : '❌ 答錯了。'}${q.explain}</p>
+        <p style="margin-top:8px;">${isCorrect ? `✅ 答對了！${currentQuizCombo >= 2 ? `連對 x${currentQuizCombo}　` : ''}` : '❌ 答錯了。'}${q.explain} ${capNote}</p>
         <button class="primary" id="nextQ">下一題</button>`;
       document.getElementById('nextQ').onclick = () => { currentQIdx += 1; drawQuiz(); };
     });
   });
+}
+
+function showQuizCombo(combo) {
+  const banner = document.createElement('div');
+  banner.className = 'combo-banner';
+  banner.textContent = `連對 x${combo}！`;
+  app.appendChild(banner);
+  setTimeout(() => banner.remove(), 900);
 }
 
 function bindQuizTypeTabs() {
@@ -302,7 +402,7 @@ function drawBattle() {
     btn.addEventListener('click', () => {
       const isCorrect = Number(btn.dataset.i) === q.answerIdx;
       const wasMastered = WYStore.getTextState(currentTextId).mastered;
-      WYStore.recordAnswer(currentTextId, isCorrect);
+      WYStore.recordAnswer(currentTextId, isCorrect, q.type);
       const beforeOpponentHp = currentBattle.opponent.curHp;
       const beforePlayerHp = currentBattle.player.curHp;
       // 隨行文魄＋文房裝備加成（無隨行/無裝備時皆回中性值 0/false/1，行為與原本一致）
@@ -310,10 +410,14 @@ function drawBattle() {
       currentBattle = WYBattle.resolveAnswer(currentBattle, isCorrect);
       if (isCorrect) {
         const bonus = WYFusionAdapter.damageBonus() + WYMarketAdapter.damageBonus();
-        if (bonus > 0) currentBattle.opponent.curHp = Math.max(0, currentBattle.opponent.curHp - bonus);
+        if (bonus > 0) {
+          currentBattle.opponent.curHp = Math.max(0, currentBattle.opponent.curHp - bonus);
+          currentBattle.log.push(`文魄／文房加持，額外造成 ${bonus} 傷害`);
+        }
         const inkExtra = (WYFusionAdapter.inkMultiplier() - 1) + (WYMarketAdapter.inkMultiplier() - 1);
         const inkBonus = Math.round(2 * inkExtra);
-        if (inkBonus > 0) WYStore.addInk(inkBonus);
+        if (inkBonus > 0) WYStore.earnInk(inkBonus);
+        updateInkHud();
         // 精通里程碑（false→true）必掉一件文房道具
         if (!wasMastered && WYStore.getTextState(currentTextId).mastered) {
           const g = WYMarketStore.rollDrop({ event: 'mastery' });

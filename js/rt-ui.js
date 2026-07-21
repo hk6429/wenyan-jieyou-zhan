@@ -27,6 +27,49 @@ const WYRt = (() => {
     try { localStorage.setItem(NICK_KEY, n); } catch { /* 隱私模式：略過 */ }
   }
 
+  // 本機裝置識別碼（3 碼）：讓科舉榜上同名同學不會被合併成同一筆／被冒名。
+  function deviceTag() {
+    try {
+      let t = localStorage.getItem('wy_rt_devtag');
+      if (!t) { t = Math.floor(Math.random() * 46656).toString(36).padStart(3, '0'); localStorage.setItem('wy_rt_devtag', t); }
+      return t;
+    } catch { return '000'; }
+  }
+  // 上榜身分＝暱稱＋裝置碼，避免菜市場名撞榜
+  function seasonNick() { return `${getNick() || '無名書生'}·${deviceTag()}`; }
+
+  // 隨行文魄＋文房裝備的對戰傷害加成（讓養成在擂台/對練也有存在感；無養成時回 0，行為不變）
+  function bonusDmg() {
+    let b = 0;
+    try { if (typeof WYFusionAdapter !== 'undefined') b += WYFusionAdapter.damageBonus() || 0; } catch { /* 忽略 */ }
+    try { if (typeof WYMarketAdapter !== 'undefined') b += WYMarketAdapter.damageBonus() || 0; } catch { /* 忽略 */ }
+    return b;
+  }
+
+  // 通用暱稱關卡：已有暱稱直接執行 next；否則先顯示站內輸入頁（取代原生 prompt）。
+  function nickGate(next) {
+    if (getNick()) return next();
+    shell(`
+      ${backBar()}
+      <div class="card">
+        <h3>先取一個擂台暱稱</h3>
+        <p class="rt-sub">1–12 字，會顯示在對戰與科舉榜上。</p>
+        <input class="rt-input" id="rt-nick-in" maxlength="12" placeholder="你的暱稱" value="${esc(getNick())}">
+        <button class="rt-btn rt-btn--main" id="rt-nick-ok">確定</button>
+        <div class="rt-err" id="rt-nick-err"></div>
+      </div>
+    `);
+    bindBack();
+    const submit = () => {
+      const n = (root.querySelector('#rt-nick-in').value || '').trim().slice(0, 12);
+      if (!n) { root.querySelector('#rt-nick-err').textContent = '暱稱不能空白'; return; }
+      setNick(n);
+      next();
+    };
+    root.querySelector('#rt-nick-ok').addEventListener('click', submit);
+    root.querySelector('#rt-nick-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  }
+
   function scopeLabel(scope) {
     if (!scope) return '';
     if (scope.mode === 'single') { const t = TEXTS.find((x) => x.id === scope.textId); return `單篇・${t ? t.title : scope.textId}`; }
@@ -55,6 +98,7 @@ const WYRt = (() => {
         <p class="rt-sub">同 seed 連線對戰・硯靈評點・科舉功名。連不上伺服器時可改用「戰帖」非同步對戰。</p>
       </div>
       <div class="rt-menu">
+        <button class="rt-btn rt-btn--main" data-go="bot">🖋️ 與硯靈對練<span>一個人也能打・不必等同學</span></button>
         <button class="rt-btn rt-btn--main" data-go="create">🏯 開房約戰<span>出一個 4 位數房號給同學</span></button>
         <button class="rt-btn rt-btn--main" data-go="join">🚪 輸房號加入<span>同學開房後把號碼給你</span></button>
         <button class="rt-btn" data-go="accept">📜 輸戰帖碼應戰<span>非同步・7 天內有效</span></button>
@@ -65,7 +109,8 @@ const WYRt = (() => {
     `);
     root.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
       const g = b.dataset.go;
-      if (g === 'create') createScreen();
+      if (g === 'bot') botScreen();
+      else if (g === 'create') createScreen();
       else if (g === 'join') joinScreen();
       else if (g === 'accept') acceptScreen();
       else if (g === 'live-stu') liveStudentScreen();
@@ -82,23 +127,14 @@ const WYRt = (() => {
     if (b) b.addEventListener('click', () => home());
   }
 
-  function askNick(cb) {
-    const cur = getNick();
-    const n = (prompt('請輸入你的擂台暱稱（1-12 字）', cur) || '').trim();
-    if (!n) return false;
-    setNick(n.slice(0, 12));
-    cb(n.slice(0, 12));
-    return true;
-  }
-
   // ---------- 開房 ----------
   function scopePicker(id) {
     const opts = TEXTS.map((t) => `<option value="${t.id}">${esc(t.title)}（${t.level === 'J' ? '國中' : '高中'}）</option>`).join('');
     return `
       <div class="rt-scope" id="${id}">
         <label><input type="radio" name="rtmode" value="mixed" checked> 混合・全 27 篇</label>
-        <label><input type="radio" name="rtmode" value="level-J"> 難度・國中 14 篇</label>
-        <label><input type="radio" name="rtmode" value="level-S"> 難度・高中 13 篇</label>
+        <label><input type="radio" name="rtmode" value="level-J"> 難度・國中 11 篇</label>
+        <label><input type="radio" name="rtmode" value="level-S"> 難度・高中 16 篇</label>
         <label><input type="radio" name="rtmode" value="single"> 單篇：</label>
         <select class="rt-single">${opts}</select>
       </div>`;
@@ -125,8 +161,8 @@ const WYRt = (() => {
     `);
     bindBack();
     root.querySelector('#rt-do-create').addEventListener('click', () => {
-      if (!getNick() && !askNick(() => {})) return;
-      doCreate(readScope());
+      const scope = readScope();
+      nickGate(() => doCreate(scope));
     });
   }
 
@@ -176,8 +212,7 @@ const WYRt = (() => {
     root.querySelector('#rt-do-join').addEventListener('click', () => {
       const code = (root.querySelector('#rt-join-code').value || '').trim();
       if (!/^\d{4}$/.test(code)) { root.querySelector('#rt-join-err').textContent = '房號是 4 位數字'; return; }
-      if (!getNick() && !askNick(() => {})) return;
-      doJoin(code);
+      nickGate(() => doJoin(code));
     });
   }
 
@@ -270,7 +305,7 @@ const WYRt = (() => {
     const prev = B.local;
     B.local = L().resolveAnswer(prev, correct, { double: B.pendingDouble, comboBoost: B.pendingBoost });
     B.dmg += L().dealtDamage(prev, B.local);
-    if (correct) B.correct += 1;
+    if (correct) { B.dmg += bonusDmg(); B.correct += 1; } // 隨行文魄／文房裝備加成
     // 標記作答
     root.querySelectorAll('.rt-opt').forEach((b, i) => {
       if (i === q.answerIdx) b.classList.add('rt-opt--right');
@@ -328,7 +363,7 @@ const WYRt = (() => {
     B.finished = true; clearTimers();
     // 賽季計分（本機＋後端）
     const s = SEASON().recordResult(SEASON().today(), verdict);
-    if (verdict !== 'draw') api('/api/rt-room', { op: 'seasonAdd', nick: B.room.nick, pts: verdict === 'win' ? SEASON().WIN_PTS : SEASON().LOSE_PTS });
+    if (verdict !== 'draw') api('/api/rt-room', { op: 'seasonAdd', nick: seasonNick(), pts: verdict === 'win' ? SEASON().WIN_PTS : SEASON().LOSE_PTS });
     const head = verdict === 'win' ? '🎉 得勝！硯靈為你添墨' : verdict === 'lose' ? '📖 惜敗，把字記牢下次贏回' : '⚖️ 平手，勢均力敵';
     const whitehat = verdict === 'lose' ? '<p class="rt-sub">科舉不倒扣——敗也記 5 分，勤能補拙。</p>' : '';
     shell(`
@@ -375,12 +410,59 @@ const WYRt = (() => {
     root.querySelector('#rt-do-accept').addEventListener('click', async () => {
       const code = (root.querySelector('#rt-ch-code').value || '').trim().toUpperCase();
       if (!/^[A-Z0-9]{6}$/.test(code)) { root.querySelector('#rt-accept-err').textContent = '戰帖碼是 6 碼英數'; return; }
-      if (!getNick() && !askNick(() => {})) return;
-      const r = await api('/api/rt-room', { op: 'accept', code });
-      if (!r) return degrade('應戰');
-      if (!r.ok) { root.querySelector('#rt-accept-err').textContent = r.error || '戰帖無效'; return; }
-      startChallengeRun({ code, seed: r.seed, scope: r.scope, challenger: r.challenger, chScore: r.score });
+      nickGate(async () => {
+        const r = await api('/api/rt-room', { op: 'accept', code });
+        if (!r) return degrade('應戰');
+        if (!r.ok) { root.querySelector('#rt-accept-err').textContent = r.error || '戰帖無效'; return; }
+        startChallengeRun({ code, seed: r.seed, scope: r.scope, challenger: r.challenger, chScore: r.score });
+      });
     });
+  }
+
+  // ---------- 與硯靈對練（單機 bot，不必等同學）----------
+  const BOT_LEVELS = [
+    { key: 'easy', label: '蒙學（易）', target: 180 },
+    { key: 'mid', label: '秀才（中）', target: 300 },
+    { key: 'hard', label: '進士（難）', target: 420 },
+  ];
+  function botScreen() {
+    clearTimers();
+    shell(`
+      ${backBar()}
+      <div class="card">
+        <h3>🖋️ 與硯靈對練</h3>
+        <p class="rt-sub">硯靈化身對手陪你練功——一個人就能打，比輸出高下。答對照樣賺墨錠；此模式不計入科舉功名（避免刷分）。</p>
+        <div class="rt-scope-line">對手強度：
+          <select id="rt-bot-lv">${BOT_LEVELS.map((l, i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${l.label}</option>`).join('')}</select>
+        </div>
+        ${scopePicker('rt-bot-scope')}
+        <button class="rt-btn rt-btn--main" id="rt-do-bot">開始對練</button>
+      </div>
+    `);
+    bindBack();
+    root.querySelector('#rt-do-bot').addEventListener('click', () => {
+      const lv = BOT_LEVELS[Number(root.querySelector('#rt-bot-lv').value)] || BOT_LEVELS[1];
+      startBotRun(readScope(), lv);
+    });
+  }
+
+  function startBotRun(scope, lv) {
+    clearTimers();
+    const seed = Math.floor(Math.random() * 1e9);
+    const jitter = (seed % 61) - 30;               // 依 seed 決定的 ±30 微調，讓目標不呆板
+    const target = Math.max(60, lv.target + jitter);
+    const qs = L().buildRounds(TEXTS, scope, seed, L().ROUNDS);
+    B = {
+      room: { code: '', seed, scope, nick: getNick() || '練功生', role: 'solo', challenge: { chScore: target, challenger: `硯靈・${lv.label}` } },
+      oppSnap: { nick: `硯靈・${lv.label}`, hp: L().MAX_HP },
+      qs, idx: 0, local: L().newLocalState(100000),
+      dmg: 0, correct: 0, done: false, finished: false,
+      oppDmg: 0, oppDone: true, oppHb: Date.now(),
+      script: EV().buildScript(seed, L().ROUNDS),
+      pendingDouble: false, pendingBoost: false, pendingEliminate: false, locked: false,
+      solo: true, bot: true,
+    };
+    renderSolo();
   }
 
   // 應戰＝單機打同 seed 同題（含硯靈），打完回報比輸出
@@ -435,7 +517,7 @@ const WYRt = (() => {
     const prev = B.local;
     B.local = L().resolveAnswer(prev, correct, { double: B.pendingDouble, comboBoost: B.pendingBoost });
     B.dmg += L().dealtDamage(prev, B.local);
-    if (correct) B.correct += 1;
+    if (correct) { B.dmg += bonusDmg(); B.correct += 1; } // 隨行文魄／文房裝備加成
     root.querySelectorAll('.rt-opt').forEach((b, i) => {
       if (i === q.answerIdx) b.classList.add('rt-opt--right');
       else if (i === v) b.classList.add('rt-opt--wrong');
@@ -450,11 +532,37 @@ const WYRt = (() => {
   async function finishChallenge() {
     B.finished = true;
     const ch = B.room.challenge;
-    const r = await api('/api/rt-room', { op: 'challengeResult', code: ch.code, nick: B.room.nick, score: B.dmg });
     const win = B.dmg > ch.chScore;
     const verdict = B.dmg === ch.chScore ? 'draw' : (win ? 'win' : 'lose');
+    const head = win ? '🎉 得勝！輸出更勝一籌' : verdict === 'draw' ? '⚖️ 平手' : '📖 惜敗，再磨一磨';
+    // 與硯靈對練（bot）：不回報後端、不計科舉功名（避免刷分），改以答對數發墨錠獎勵（受每日上限）。
+    if (B.bot) {
+      let inkLine = '';
+      try {
+        const before = WYStore.getInk();
+        WYStore.earnInk(B.correct);
+        const got = WYStore.getInk() - before;
+        if (typeof updateInkHud === 'function') updateInkHud();
+        inkLine = got > 0 ? `<p class="rt-sub">答對 ${B.correct} 題，獲得 ${got} 🪶 墨錠。</p>` : '<p class="rt-sub">今日墨錠已達上限，明天再賺。</p>';
+      } catch { /* 忽略 */ }
+      shell(`
+        <div class="card rt-result rt-result--${verdict}">
+          <h2>${head}</h2>
+          <div class="rt-score">你：${B.dmg} 輸出　vs　${esc(ch.challenger)}：${ch.chScore} 輸出</div>
+          ${inkLine}
+          <div class="rt-result-btns">
+            <button class="rt-btn rt-btn--main" id="rt-bot-again">再練一場</button>
+            <button class="rt-btn" data-back>返回擂台</button>
+          </div>
+        </div>
+      `);
+      bindBack();
+      root.querySelector('#rt-bot-again').addEventListener('click', () => botScreen());
+      return;
+    }
+    const r = await api('/api/rt-room', { op: 'challengeResult', code: ch.code, nick: B.room.nick, score: B.dmg });
     const s = SEASON().recordResult(SEASON().today(), verdict);
-    const head = win ? '🎉 應戰得勝！輸出更勝一籌' : verdict === 'draw' ? '⚖️ 平手' : '📖 惜敗，再磨一磨';
+    if (verdict !== 'draw') api('/api/rt-room', { op: 'seasonAdd', nick: seasonNick(), pts: verdict === 'win' ? SEASON().WIN_PTS : SEASON().LOSE_PTS });
     shell(`
       <div class="card rt-result rt-result--${verdict}">
         <h2>${head}</h2>
