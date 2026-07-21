@@ -3,7 +3,7 @@
 // 純邏輯全在 WYMarketStore；金流走 WYStore（墨錠）；網路一律 WYAPI.call('/api/market')，⛔ 全檔唯一出口、禁裸 fetch。
 const WYMarket = (() => {
   let mount = null;
-  let tab = 'browse';
+  let tab = 'yanling';   // 預設落在硯靈行商（平日恆開、免班級碼），避免第一次進市集就撞「未開市／需設定」死牆
   let scope = 'class';   // browse 子範圍：class | pub
   const S = () => window.WYMarketStore;
 
@@ -29,7 +29,7 @@ const WYMarket = (() => {
         <div class="mkt-head-row">
           <div><h3 style="margin:0;">文房市集</h3>
             <p class="mkt-sub">同窗之間交換筆墨紙硯——文豪與文魄是師友，不是商品。</p></div>
-          <div class="mkt-ink">🪶 墨錠 <strong>${WYStore.getInk()}</strong></div>
+          <div class="mkt-ink">墨錠 <strong>${WYStore.getInk()}</strong></div>
         </div>
         <div class="mkt-meta-row">
           <span class="mkt-badge ${open ? 'mkt-open' : 'mkt-closed'}">${open ? '🔥 開市中' : '⏳ ' + esc(S().nextOpenText(now()))}</span>
@@ -63,7 +63,7 @@ const WYMarket = (() => {
   const tabBtn = (key, label) => `<button class="mkt-tab-btn ${tab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`;
 
   function needIdentity() {
-    return `<div class="card mkt-guide">先設定班級代碼與道號，才能進集市交易。<br><button class="primary" id="mkt-go-setid">設定班級與道號</button></div>`;
+    return `<div class="card mkt-guide">這一區是同班／全站同學之間的交易，需先設定班級代碼與道號。<br>還沒有班級也沒關係——左邊「硯靈行商」平日就能用墨錠直接買基礎文房。<br><button class="primary" id="mkt-go-setid">設定班級與道號</button></div>`;
   }
 
   function drawBody() {
@@ -116,7 +116,7 @@ const WYMarket = (() => {
             <div class="mkt-card-sub"><span class="mkt-tier mkt-tier-g${grade}">${tier ? S().TIER_LABEL[tier] : ''}</span>　${esc(S().CAT_LABEL[g.cat] || '')}${it.reserved ? '　🔒保留單' : ''}</div>
             <div class="mkt-card-seller">賣家：${esc(it.seller)}</div>
           </div>
-          <div class="mkt-card-price">🪶 ${it.price}</div>
+          <div class="mkt-card-price">${it.price} 墨</div>
         </div>
         ${open ? `<button class="primary mkt-buy-btn" data-buy="${esc(it.id)}" data-price="${it.price}" data-gear="${esc(it.gearId)}">購買</button>` : '<div class="mkt-closed-hint">平日僅供瀏覽</div>'}
       </div>`;
@@ -231,7 +231,7 @@ const WYMarket = (() => {
       const g = S().GEAR_BY_ID[c.gearId] || { name: c.gearId };
       return `<div class="card mkt-card"><div class="mkt-card-main">
           <div class="mkt-card-info"><strong class="mkt-card-name">${esc(g.name)}</strong>
-            <div class="mkt-card-sub">定價 🪶 ${c.price}${c.reserveFor ? '　🔒保留給 ' + esc(c.reserveFor) : ''}</div></div>
+            <div class="mkt-card-sub">定價 ${c.price} 墨${c.reserveFor ? '　🔒保留給 ' + esc(c.reserveFor) : ''}</div></div>
           <button class="primary mkt-check-btn" data-id="${esc(c.id)}">檢查/領款</button>
         </div><div class="mkt-mine-result" data-r="${esc(c.id)}"></div></div>`;
     }).join('')}</div>`;
@@ -250,7 +250,7 @@ const WYMarket = (() => {
       S().removeClaim(id);
       S().recordEverOwned({ gearId: c.gearId, dir: 'sold', peer: res.buyer || '', ts: now() });
       const card = S().THANKS_CARDS.find((k) => k.id === res.card);
-      if (out) out.innerHTML = `✅ 已售出！入帳 🪶 ${net}（已扣 10% 稅）${res.buyer ? '　買家：' + esc(res.buyer) : ''}${card ? `<div class="mkt-thanks-got">💌 ${esc(card.text)}</div>` : ''}`;
+      if (out) out.innerHTML = `✅ 已售出！入帳 ${net} 墨（已扣 10% 稅）${res.buyer ? '　買家：' + esc(res.buyer) : ''}${card ? `<div class="mkt-thanks-got">💌 ${esc(card.text)}</div>` : ''}`;
       setTimeout(draw, 1600);
       return;
     }
@@ -309,7 +309,7 @@ const WYMarket = (() => {
     const price = S().YANLING_PRICE;
     body.innerHTML = `
       <div class="card mkt-yanling-head">
-        <p class="mkt-sub">🖋️ 硯靈平日擺攤，只賣「凡品」四寶，每件 <strong>${price}</strong> 🪶 墨錠，隨買隨得。想要良品／珍品，週末找同窗交易。</p>
+        <p class="mkt-sub">🖋️ 硯靈平日擺攤，只賣「凡品」四寶，每件 <strong>${price}</strong> 墨錠，隨買隨得。想要良品／珍品，週末找同窗交易。</p>
       </div>
       <div class="mkt-list">
         ${stock.map((g) => `
@@ -319,7 +319,7 @@ const WYMarket = (() => {
                 <strong class="mkt-card-name">${esc(g.name)}</strong>
                 <div class="mkt-card-sub">${esc(g.catLabel)}・凡品　${esc(g.desc)}</div>
               </div>
-              <button class="primary mkt-buy-btn" data-yl="${esc(g.id)}">${price} 🪶 購入</button>
+              <button class="primary mkt-buy-btn" data-yl="${esc(g.id)}">${price} 墨・購入</button>
             </div>
           </div>`).join('')}
       </div>`;

@@ -41,8 +41,9 @@ const WYFusion = (() => {
         <div class="fusion-head-row">
           <div><h3 style="margin:0;">文魄合契</h3>
             <p class="fusion-sub">兩位文豪結為知音，喚醒共同精神所化的文魄。</p></div>
-          <div class="fusion-ink">🪶 墨錠 <strong>${WYStore.getInk()}</strong></div>
+          <div class="fusion-ink">墨錠 <strong>${WYStore.getInk()}</strong></div>
         </div>
+        ${ownedCount === 0 ? `<div class="fusion-onboard">還沒喚醒文魄？合契需要先<b>精通兩篇</b>（各答對率 ≥80%、作答 ≥30 題）。先去讀文章＋自測吧。<button class="fusion-mini-btn" id="fusion-go-list">去選文自測 →</button></div>` : ''}
         <div class="fusion-meta-row">
           <span class="badge">已喚醒 ${ownedCount} / 6</span>
           <span class="fusion-nick">道號：<strong>${nickname ? esc(nickname) : '（未設）'}</strong>
@@ -110,6 +111,8 @@ const WYFusion = (() => {
 
   function bind(fusion) {
     const q = (sel) => mount.querySelectorAll(sel);
+    const goList = mount.querySelector('#fusion-go-list');
+    if (goList) goList.onclick = () => { if (typeof setActiveTab === 'function') setActiveTab('list'); if (typeof renderList === 'function') renderList(); };
     const nick = mount.querySelector('#editNick');
     if (nick) nick.onclick = () => {
       const cur = fusion.nickname || '';
@@ -209,7 +212,7 @@ const WYFusion = (() => {
     c.width = W; c.height = H;
     const g = c.getContext('2d');
     g.fillStyle = '#f5ecd6'; g.fillRect(0, 0, W, H);
-    g.strokeStyle = '#b23b2e'; g.lineWidth = 8; g.strokeRect(24, 24, W - 48, H - 48);
+    g.strokeStyle = '#9e3b2c'; g.lineWidth = 8; g.strokeRect(24, 24, W - 48, H - 48);
     g.fillStyle = '#8a6a3b'; g.font = '28px "Noto Serif TC", serif';
     g.textAlign = 'center';
     g.fillText('文言解憂站 · 文魄名片', W / 2, 90);
@@ -218,7 +221,7 @@ const WYFusion = (() => {
       g.fillStyle = '#3a2f22';
       g.font = 'bold 60px "Ma Shan Zheng","Noto Serif TC",serif';
       g.fillText(w.name, W / 2, 640);
-      g.fillStyle = '#6b5f4f'; g.font = '30px "Noto Serif TC",serif';
+      g.fillStyle = '#6b5f52'; g.font = '30px "Noto Serif TC",serif';
       const pair = w.parents.map((tid) => textOf(tid).title).join(' × ');
       g.fillText(pair, W / 2, 700);
       const chosen = w.passives.find((x) => x.id === fusion.wenpo[wenpoId].passive);
@@ -239,7 +242,7 @@ const WYFusion = (() => {
     img.onload = () => { g.drawImage(img, W / 2 - 220, 130, 440, 440); paint(); };
     img.onerror = () => {
       g.fillStyle = '#e7dabb'; g.fillRect(W / 2 - 220, 130, 440, 440);
-      g.fillStyle = '#b23b2e'; g.font = 'bold 160px serif'; g.textAlign = 'center';
+      g.fillStyle = '#9e3b2c'; g.font = 'bold 160px serif'; g.textAlign = 'center';
       g.fillText(w.element[0], W / 2, 400);
       g.textAlign = 'center'; paint();
     };

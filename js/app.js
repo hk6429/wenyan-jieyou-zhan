@@ -35,10 +35,16 @@ const WYSound = (() => {
   };
 })();
 
-// header 常駐墨錠計數器：任何得到/花費墨錠的動作後呼叫，讓玩家隨時看得到餘額
+// header 常駐墨錠計數器：任何得到/花費墨錠的動作後呼叫，讓玩家隨時看得到餘額＋今日賺取進度
 function updateInkHud() {
   const el = document.getElementById('ink-count');
   if (el) el.textContent = WYStore.getInk();
+  const today = document.getElementById('ink-today');
+  if (today) {
+    const t = WYStore.inkToday();
+    today.textContent = `今日 ${t.earned}/${t.cap}`;
+    today.classList.toggle('ink-today-full', t.left === 0);
+  }
 }
 
 // 墨錠飄字（沿用戰鬥浮字語彙，附在指定元素上；elOrSel 可為元素或選擇器，預設 header 計數器）
@@ -48,7 +54,7 @@ function floatInk(amount, elOrSel) {
   if (!anchor) return;
   const f = document.createElement('span');
   f.className = 'ink-float';
-  f.textContent = `+${amount}🪶`;
+  f.textContent = `+${amount} 墨`;
   anchor.appendChild(f);
   setTimeout(() => f.remove(), 1000);
 }
@@ -65,6 +71,12 @@ async function boot() {
   WYRt.init(TEXTS);
   WYMarket.init(TEXTS);
   updateInkHud();
+  const reopen = document.getElementById('guide-reopen');
+  if (reopen) reopen.onclick = () => {
+    try { localStorage.removeItem('wy_guide_seen'); } catch { /* 隱私模式：略過 */ }
+    setActiveTab('list');
+    renderList();
+  };
   renderTab('list');
 }
 
@@ -106,20 +118,20 @@ function renderList() {
       <h3>怎麼玩？三步驟</h3>
       <ol class="guide-steps">
         <li><b>讀一篇</b>：點下面任一篇，看原文＋白話語譯＋注釋賞析。</li>
-        <li><b>去「自測」練到精通</b>：答對就賺 🪶 墨錠，答對率達 80% 就精通。</li>
-        <li><b>「對戰」解鎖文豪</b>：前兩位對手一開始就能打，精通更多篇解鎖後面的高手。</li>
+        <li><b>去「自測」練到精通</b>：答對就賺墨錠，答對率達 80% 就精通這一篇。</li>
+        <li><b>「對戰」解鎖文豪</b>：單人闖關打文豪，前兩位一開始就能打，精通更多篇解鎖後面的高手。</li>
       </ol>
-      <p class="guide-more">行有餘力再逛：草堂掛名句、擂台約同學對戰、合契收文魄、市集換文房四寶。</p>
+      <p class="guide-more">行有餘力再逛「江湖」：草堂掛名句、擂台跟同學連線 PK、合契收文魄、市集換文房四寶（平日先逛硯靈行商）。</p>
     </div>`;
   app.innerHTML = streakHtml + guideHtml + renderDashboard() + TEXTS.map((t) => {
     const ratio = Math.round(WYStore.masteryRatio(t.id) * 100);
     return `
-      <div class="card text-list-item" data-id="${t.id}">
+      <div class="card text-list-item" data-id="${t.id}" role="button" tabindex="0">
         <div>
           <strong>${t.title}</strong>　${t.author}
-          <div style="font-size:.8rem;color:#6b5f4f;">${t.era}·${t.genre}</div>
+          <div style="font-size:.8rem;color:var(--ink-dan);">${t.era}·${t.genre}</div>
         </div>
-        <span class="badge">${t.level === 'J' ? '國中' : '高中'}·${ratio}%</span>
+        <span class="badge-group"><span class="badge-level">${t.level === 'J' ? '國中' : '高中'}</span><span class="badge-pct">${ratio}%</span></span>
       </div>`;
   }).join('');
   const gc = document.getElementById('guideClose');
@@ -129,10 +141,12 @@ function renderList() {
     if (card) card.remove();
   };
   app.querySelectorAll('.text-list-item').forEach((el) => {
-    el.addEventListener('click', () => {
+    const open = () => {
       currentTextId = el.dataset.id;
       renderTextDetail(TEXTS.find((x) => x.id === currentTextId));
-    });
+    };
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   });
 }
 
@@ -182,7 +196,7 @@ function renderTextDetail(t) {
     <div class="card">
       <button class="link-back" id="backToList">◂ 返回選文</button>
       <h2>${t.title}</h2>
-      <p style="color:#6b5f4f">${t.author}·${t.era}</p>
+      <p style="color:var(--ink-dan)">${t.author}·${t.era}</p>
     </div>
     ${t.segments.map((seg, i) => `
       <div class="card segment-block">
@@ -272,7 +286,7 @@ function drawFlashcard() {
   app.innerHTML = `
     <div class="card">
       <div class="badge">${p.idx}/${p.total}</div>
-      <div class="flashcard ${flashcardFlipped ? 'flipped' : ''}" id="flashcardEl">
+      <div class="flashcard ${flashcardFlipped ? 'flipped' : ''}" id="flashcardEl" role="button" tabindex="0" aria-label="翻面卡片">
         <div class="flashcard-inner">
           <div class="flashcard-face flashcard-front">
             <p class="passage">${card.front}</p>
@@ -290,10 +304,12 @@ function drawFlashcard() {
         <button class="primary" id="nextBtn">下一張</button>
       </div>
     </div>`;
-  document.getElementById('flashcardEl').onclick = () => {
+  const flipCard = () => {
     flashcardFlipped = !flashcardFlipped;
     document.getElementById('flashcardEl').classList.toggle('flipped', flashcardFlipped);
   };
+  document.getElementById('flashcardEl').onclick = flipCard;
+  document.getElementById('flashcardEl').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); } });
   document.getElementById('prevBtn').onclick = () => { flashcardFlipped = false; WYFlashcard.prev(); drawFlashcard(); };
   document.getElementById('nextBtn').onclick = () => { flashcardFlipped = false; WYFlashcard.next(); drawFlashcard(); };
 }
@@ -320,7 +336,7 @@ function drawQuiz() {
   const typeFilterHtml = noteHtml + `
     <div class="card">
       <p class="quiz-focus">📖 自測：《${currentQuiz.title}》　<button class="link-back" id="quizPickOther">換一篇</button></p>
-      <p style="font-size:.8rem;color:#6b5f4f;margin:0 0 6px;">練習題型（可先專攻單一題型打基礎）</p>
+      <p style="font-size:.8rem;color:var(--ink-dan);margin:0 0 6px;">練習題型（可先專攻單一題型打基礎）</p>
       <div class="quiz-type-tabs">
         ${QUIZ_TYPES.map((qt) => `<button class="quiz-type-btn ${qt.key === currentQuizType ? 'active' : ''}" data-type="${qt.key ?? ''}">${qt.label}</button>`).join('')}
       </div>
@@ -398,14 +414,15 @@ function bindQuizTypeTabs() {
 function renderBattle() {
   const roster = WYBattle.unlockedRoster();
   app.innerHTML = `<div class="card"><h3>選擇對手</h3>
+    <p style="font-size:.85rem;color:var(--ink-dan);margin:.2em 0 0;">單人闖關，答對就攻擊文豪、答錯換牠出招（想跟同學連線 PK 請去「擂台」）。</p>
     <div class="opponent-grid">
       ${roster.map((r) => `
         <button class="opponent-card ${r.unlocked ? '' : 'locked'}" data-id="${r.id}" ${r.unlocked ? '' : 'disabled'}>
-          <img src="${r.img}" alt="${r.name}" />
+          <img src="${r.img}" alt="${r.name}" loading="lazy" width="72" height="72" />
           <span>${r.name}${r.unlocked ? '' : '（未解鎖）'}</span>
         </button>`).join('')}
     </div>
-    <p style="font-size:.8rem;color:#6b5f4f;">解鎖條件：對應篇目答對率達 80% 以上</p></div>`;
+    <p style="font-size:.8rem;color:var(--ink-dan);">解鎖條件：對應篇目答對率達 80% 以上</p></div>`;
   app.querySelectorAll('button[data-id]').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentBattle = WYBattle.newBattle(btn.dataset.id);
@@ -423,7 +440,7 @@ function drawBattle() {
   app.innerHTML = `
     <div class="card battle-card">
       <div class="battle-vs">
-        <img class="battle-portrait" src="${b.opponent.img}" alt="${b.opponent.name}" />
+        <img class="battle-portrait" src="${b.opponent.img}" alt="${b.opponent.name}" loading="lazy" width="64" height="64" />
         <div style="flex:1;">
           <strong>${b.opponent.name}</strong>
           <div class="hp-bar"><div class="hp-fill enemy" style="width:${b.opponent.curHp}%"></div></div>
@@ -433,7 +450,7 @@ function drawBattle() {
       </div>
       <p>${q.stem}</p>
       <div class="options">${q.options.map((opt, i) => `<button data-i="${i}">${opt}</button>`).join('')}</div>
-      <p style="font-size:.85rem;color:#6b5f4f;">${b.log.slice(-1)[0] || ''}</p>
+      <p style="font-size:.85rem;color:var(--ink-dan);">${b.log.slice(-1)[0] || ''}</p>
     </div>`;
   if (b.finished) {
     app.innerHTML = `<div class="card"><h3>${b.win ? '🎉 你贏了！' : '💀 你被擊敗了'}</h3><button class="primary" id="backBattle">返回對戰選單</button></div>`;
@@ -517,7 +534,7 @@ function renderWenhao() {
       ${roster.map((r) => `
         <div class="wenhao-card ${r.unlocked ? '' : 'locked'}">
           <span class="wenhao-no">${r.id.toUpperCase()}</span>
-          <img src="${r.img}" alt="${r.title}" class="wenhao-portrait" />
+          <img src="${r.img}" alt="${r.title}" class="wenhao-portrait" loading="lazy" />
           <strong>${r.title}</strong>
           <div style="font-size:.8rem;">${r.author}</div>
           <div style="font-size:.8rem;">${r.unlocked ? '已收錄' : `答對率 ${r.progress}%`}</div>

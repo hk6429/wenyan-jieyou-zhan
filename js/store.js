@@ -53,7 +53,8 @@ const WYStore = (() => {
       t.correct += 1;
       _earnInkInto(state, 2);
     }
-    t.mastered = t.total >= 8 && t.correct / t.total >= 0.8;
+    // 一旦達標即永久精通（sticky）：認真答到 80% 後不會因後續偶爾答錯被歷史稀釋拉回，避免「越練越掉」的挫折
+    t.mastered = t.mastered || (t.total >= 8 && t.correct / t.total >= 0.8);
     if (qType && QUIZ_TYPES.includes(qType)) {
       if (!state.byType) state.byType = {};
       if (!state.byType[qType]) state.byType[qType] = { correct: 0, total: 0 };

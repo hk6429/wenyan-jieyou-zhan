@@ -1,7 +1,7 @@
 :root {
   /* 墨階（濃淡乾濕清五色） */
   --ink-jiao:#1a1613; --ink-nong:#2b2420; --ink-zhong:#4a4038;
-  --ink-dan:#7d726a; --ink-qing:#b8ab9c; --ink-xi:#d9cfc0;
+  --ink-dan:#6b5f52; --ink-qing:#b8ab9c; --ink-xi:#d9cfc0; /* ink-dan 已加深至對宣紙 ~5.5:1，供小字達 WCAG AA */
 
   /* 宣紙 */
   --paper:#f7f2e7; --paper-warm:#efe6d3; --paper-aged:#e6d9bf;
@@ -319,7 +319,7 @@ button.primary:active { transform: scale(.97); }
   width: 72px; height: 72px;
   object-fit: cover;
   object-position: top center;
-  border-radius: 50%;
+  border-radius: 6px;
   border: 2px solid var(--zhu);
   background: var(--paper-warm);
 }
@@ -336,7 +336,7 @@ button.primary:active { transform: scale(.97); }
   width: 64px; height: 64px;
   object-fit: cover;
   object-position: top center;
-  border-radius: 50%;
+  border-radius: 6px;
   border: 2px solid var(--zhu);
   flex-shrink: 0;
 }
@@ -360,7 +360,7 @@ button.primary:active { transform: scale(.97); }
   position: absolute;
   top: 6px; left: 8px;
   font-size: .68rem;
-  color: var(--ink-qing);
+  color: var(--ink-dan);
   letter-spacing: .05em;
 }
 .wenhao-card strong { font-family: var(--font-brush); font-weight: 400; letter-spacing: .04em; }
@@ -400,9 +400,10 @@ button.primary:active { transform: scale(.97); }
 .seg-tab-btn {
   border: none;
   background: transparent;
-  padding: 6px 10px 8px;
+  padding: 10px 12px;
+  min-height: 40px;
   font-family: var(--font-ui);
-  font-size: .8rem;
+  font-size: .82rem;
   color: var(--ink-dan);
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -444,9 +445,10 @@ button.primary:active { transform: scale(.97); }
 .quiz-type-btn {
   border: 1px solid var(--line);
   background: var(--paper);
-  border-radius: 14px;
-  padding: 5px 12px;
-  font-size: .78rem;
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-height: 40px;
+  font-size: .82rem;
   color: var(--ink-dan);
   cursor: pointer;
 }
@@ -571,6 +573,53 @@ button.primary:active { transform: scale(.97); }
 .quiz-focus { font-size: 1rem; color: var(--ink-jiao); margin: 0 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .quiz-focus .link-back { font-size: .8rem; }
 .quiz-note { border-left: 4px solid var(--zhu); color: var(--ink-zhong); font-size: .9rem; }
+
+/* ── 全域鍵盤焦點指示（a11y：div/button 皆可見）── */
+:focus-visible { outline: 2px solid var(--zhu); outline-offset: 2px; border-radius: 3px; }
+.text-list-item:focus-visible, .flashcard:focus-visible { box-shadow: var(--shadow-lift); }
+
+/* header 工具區：新手教學「?」＋墨錠 HUD */
+.header-tools { display: flex; align-items: center; gap: 8px; }
+.guide-reopen {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 1px solid var(--ink-xi); border-radius: 50%;
+  background: var(--paper); color: var(--ink-dan);
+  font-family: var(--font-brush); font-size: 1.05rem; line-height: 1;
+  cursor: pointer;
+}
+.guide-reopen:hover { color: var(--zhu); border-color: var(--zhu); }
+.ink-today { display: block; font-family: var(--font-ui); font-size: .62rem; font-weight: 500; color: var(--ink-dan); letter-spacing: .02em; margin-top: 1px; }
+.ink-today-full { color: var(--zhu); }
+
+/* 次級導覽（江湖：草堂/擂台/合契/市集），視覺弱化以突顯主線 */
+nav.tabs.tabs-sub { padding-top: 2px; padding-bottom: 2px; align-items: center; }
+nav.tabs.tabs-sub button { flex: 1; font-size: .82rem; padding: 7px 6px 8px; color: var(--ink-dan); }
+nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
+.tabs-sub-label {
+  flex: 0 0 auto; font-family: var(--font-brush); font-size: .8rem;
+  color: var(--ink-qing); padding: 0 6px 0 2px; letter-spacing: .1em;
+}
+
+/* 拆分學段／精通率徽章 */
+.badge-group { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.badge-level {
+  display: inline-block; padding: 2px 8px; border-radius: 3px;
+  font-size: .72rem; border: 1px solid var(--qing-shi); color: var(--qing-shi);
+  background: rgba(58,90,110,.06); letter-spacing: .03em;
+}
+.badge-pct {
+  display: inline-block; padding: 2px 8px; border-radius: 3px;
+  font-size: .72rem; background: var(--paper-warm); color: var(--ink-zhong);
+  border: 1px solid var(--line);
+}
+
+/* 合契坊新手導流 */
+.fusion-onboard {
+  margin: 8px 0 0; padding: 8px 10px; font-size: .85rem; line-height: 1.7;
+  color: var(--ink-zhong); background: rgba(158,59,44,.05);
+  border-left: 3px solid var(--zhu); border-radius: 3px;
+}
+.fusion-onboard .fusion-mini-btn { margin-left: 4px; }
 
 @media (max-width: 480px) {
   main { padding: 10px; }

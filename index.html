@@ -20,17 +20,22 @@
       <h1>文言解憂站</h1>
       <p>國中·高中文言文閱讀理解練功站</p>
     </div>
-    <div id="ink-hud" class="ink-hud" title="墨錠：答對可得，用於合契與市集">🪶 <span id="ink-count">0</span></div>
+    <div class="header-tools">
+      <button id="guide-reopen" class="guide-reopen" title="怎麼玩" aria-label="怎麼玩，重看新手教學">?</button>
+      <div id="ink-hud" class="ink-hud" title="墨錠：答對可得，用於合契與市集，每日賺取有上限">墨錠 <span id="ink-count">0</span><span id="ink-today" class="ink-today"></span></div>
+    </div>
   </div>
 </header>
 
-<nav class="tabs">
+<nav class="tabs" aria-label="核心學習">
   <button data-tab="list" class="active">選文</button>
   <button data-tab="flashcard">閃卡</button>
   <button data-tab="quiz">自測</button>
   <button data-tab="battle">對戰</button>
   <button data-tab="wenhao">文豪錄</button>
-  <span class="tab-sep" aria-hidden="true"></span>
+</nav>
+<nav class="tabs tabs-sub" aria-label="進階江湖">
+  <span class="tabs-sub-label" aria-hidden="true">江湖</span>
   <button data-tab="caotang">草堂</button>
   <button data-tab="rt">擂台</button>
   <button data-tab="fusion">合契</button>

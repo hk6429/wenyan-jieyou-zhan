@@ -543,7 +543,7 @@ const WYRt = (() => {
         WYStore.earnInk(B.correct);
         const got = WYStore.getInk() - before;
         if (typeof updateInkHud === 'function') updateInkHud();
-        inkLine = got > 0 ? `<p class="rt-sub">答對 ${B.correct} 題，獲得 ${got} 🪶 墨錠。</p>` : '<p class="rt-sub">今日墨錠已達上限，明天再賺。</p>';
+        inkLine = got > 0 ? `<p class="rt-sub">答對 ${B.correct} 題，獲得 ${got} 墨錠。</p>` : '<p class="rt-sub">今日墨錠已達上限，明天再賺。</p>';
       } catch { /* 忽略 */ }
       shell(`
         <div class="card rt-result rt-result--${verdict}">
