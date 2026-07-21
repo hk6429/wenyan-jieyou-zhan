@@ -105,6 +105,34 @@ for (const img of rosterImgs) {
   }
 }
 
+// ── 選項長度平衡檢查（防「正解＝唯一最長選項」的作弊捷徑）──────────────
+// 病徵：正解是四選項中「唯一最長」且與最短選項差距 ≥4 字 → 學生不讀題、挑最長的就高機率過關。
+// 修法＝把誘答改寫成等長語意陷阱（正解文字保持不變）。此處鎖基線，只能往下修不能回升。
+const LEN_SPREAD_TELL = 4;        // 正解比最短長 ≥ 這麼多字即視為「長度外洩」
+const MAX_EXPLOITABLE = 7;        // 27 篇誘答等長改寫完工後鎖定基線（905→7＝0.5%）；只能往下不得回升
+function chars(s) { return [...String(s)].length; }
+let exploitable = 0;
+for (const t of texts) {
+  for (const q of t.questions || []) {
+    if (!Array.isArray(q.options) || q.options.length !== 4 || typeof q.answer !== 'number') continue;
+    const L = q.options.map(chars);
+    const max = Math.max(...L);
+    const uniqLongest = L[q.answer] === max && L.filter((x) => x === max).length === 1;
+    if (uniqLongest && max - Math.min(...L) >= LEN_SPREAD_TELL) exploitable++;
+  }
+}
+const exploitPct = (exploitable / seenQTotal() * 100).toFixed(1);
+if (exploitable > MAX_EXPLOITABLE) {
+  errors.push(`選項長度外洩題數 ${exploitable}（${exploitPct}%）超過基線 ${MAX_EXPLOITABLE}——不得回升，請改寫誘答為等長`);
+} else {
+  warnings.push(`選項長度外洩題數 ${exploitable}（${exploitPct}%），基線 ${MAX_EXPLOITABLE}（越低越好，目標 ≤340）`);
+}
+function seenQTotal() {
+  let n = 0;
+  for (const t of texts) for (const q of t.questions || []) if (Array.isArray(q.options)) n++;
+  return n;
+}
+
 console.log(`共檢查 ${texts.length} 篇文本。`);
 if (warnings.length) {
   console.log(`\n⚠️  警告 ${warnings.length} 則：`);

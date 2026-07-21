@@ -736,10 +736,19 @@ const WYRt = (() => {
         draw('end', live.qNo, rows.length);
         const herald = WALL().buildHerald({ label: h.code, rows });
         const board = WALL().safeBoard(rows, '__host__');
+        // 老師戰情室：逐題正確率熱點（紅字＝全班正確率 <50%，隔天課堂優先講評）
+        const hot = WALL().questionHotspots(rows, h.qn);
+        const coldN = hot.filter((x) => x.cold).length;
+        const hotHtml = rows.length ? `
+          <div class="rt-hotspots">
+            <p class="rt-hot-title">📊 逐題正確率　<small>${coldN ? `${coldN} 題全班卡關（紅），建議課堂講評` : '全班表現平穩'}</small></p>
+            <div class="rt-hot-grid">${hot.map((x) => `<span class="rt-hot-cell ${x.cold ? 'cold' : x.pct >= 80 ? 'hot-good' : ''}" title="第${x.qNo}題　${x.correct}/${x.answered} 人答對">${x.qNo}<b>${x.pct == null ? '—' : x.pct + '%'}</b></span>`).join('')}</div>
+          </div>` : '';
         const el = root.querySelector('#rt-h-herald');
         if (el) el.innerHTML = `
           <div class="rt-herald">${herald.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
-          <div class="rt-board">${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}</div>`;
+          <div class="rt-board">${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}</div>
+          ${hotHtml}`;
       } else {
         draw(live.phase, live.qNo, answered);
       }

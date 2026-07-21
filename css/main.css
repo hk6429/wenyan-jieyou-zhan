@@ -56,29 +56,51 @@ body::before {
 
 header, nav.tabs, main, footer { position: relative; z-index: 1; }
 
-header {
-  padding: 22px 16px 26px;
-  text-align: center;
+/* 首頁 hero：水墨橫幅主視覺（右側遠山書卷）＋左向宣紙漸層讓標題清晰 */
+header.hero {
+  position: relative;
+  padding: 0;
+  min-height: 216px;
+  display: flex;
+  align-items: flex-start;
   border-bottom: 1px solid var(--line);
   background:
-    radial-gradient(ellipse 70% 120% at 50% -20%, rgba(158,59,44,.06), transparent 65%);
+    linear-gradient(100deg, var(--paper) 0%, rgba(247,242,231,.94) 24%, rgba(247,242,231,.55) 44%, rgba(247,242,231,.12) 60%, transparent 74%),
+    url('../assets/hero/wy-hero.jpg') right center / cover no-repeat,
+    var(--paper);
 }
-
-header h1 {
+header.hero .header-row {
+  width: 100%;
+  padding: 22px 16px;
+  align-items: flex-start;
+}
+.hero-title { max-width: 62%; }
+header.hero h1 {
   margin: 0;
   font-family: var(--font-brush);
   font-weight: 400;
-  font-size: 2rem;
-  letter-spacing: .08em;
+  font-size: 2.6rem;
+  line-height: 1.04;
+  letter-spacing: .1em;
   color: var(--ink-jiao);
+  text-shadow: 0 1px 0 rgba(247,242,231,.8);
 }
-
-header p {
-  margin: 6px 0 0;
+.hero-tag {
+  margin: 12px 0 0;
+  font-family: var(--font-brush);
+  font-size: 1.2rem;
+  letter-spacing: .14em;
+  color: var(--zhu);
+}
+.hero-sub {
+  margin: 7px 0 0;
   color: var(--ink-dan);
-  font-size: .85rem;
+  font-size: .8rem;
   letter-spacing: .04em;
 }
+/* HUD／新手鈕疊在水墨上，給實心宣紙底確保可讀 */
+header.hero .ink-hud { background: var(--paper); box-shadow: 0 1px 5px rgba(26,22,19,.14); }
+header.hero .guide-reopen { box-shadow: 0 1px 5px rgba(26,22,19,.12); }
 
 nav.tabs {
   display: flex;
@@ -621,8 +643,181 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 }
 .fusion-onboard .fusion-mini-btn { margin-left: 4px; }
 
+/* 自測「對照原文」面板（B8：作答時把原文帶回現場） */
+.quiz-source > summary { cursor: pointer; font-size: .9rem; color: var(--zhu); font-weight: 500; list-style: none; }
+.quiz-source > summary::-webkit-details-marker { display: none; }
+.quiz-source > summary::before { content: '▸ '; }
+.quiz-source[open] > summary::before { content: '▾ '; }
+.quiz-source .passage { margin-top: 8px; }
+
+/* 填空生成題（B1 generation effect） */
+.cloze-hint { color: var(--ink-dan); font-size: .9rem; margin: 6px 0 0; }
+.cloze-prompt { font-size: 1.15rem; line-height: 1.9; margin: 10px 0; }
+.cloze-input-row { display: flex; gap: 8px; margin-top: 10px; }
+.cloze-input { flex: 1; padding: 10px 12px; font-size: 1.05rem; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink-jiao); font-family: inherit; min-height: 40px; }
+.cloze-input:focus { outline: 2px solid var(--zhu); outline-offset: 1px; }
+.cloze-input.correct { border-color: #3c7a4e; background: rgba(60,122,78,.08); }
+.cloze-input.wrong { border-color: var(--zhu); background: rgba(158,59,44,.08); }
+
 @media (max-width: 480px) {
   main { padding: 10px; }
-  header h1 { font-size: 1.6rem; }
+  header.hero { min-height: 188px; }
+  header.hero h1 { font-size: 2rem; }
+  .hero-tag { font-size: 1.02rem; letter-spacing: .1em; }
+  .hero-sub { font-size: .74rem; }
+  .hero-title { max-width: 60%; }
   .ink-hud { font-size: 1rem; padding: 3px 11px; }
 }
+
+
+/* ============ 遊戲化改版（十專家綜合 14 項）新元件 ============ */
+
+/* 首屏：新手起手卡 */
+.start-card{ text-align:center; padding:24px 18px; background:linear-gradient(180deg,var(--paper-warm),var(--paper)); cursor:pointer; }
+.start-card:hover{ box-shadow:var(--shadow-lift); }
+.start-kicker{ display:block; font-size:.82rem; color:var(--zhu); margin-bottom:.4em; }
+.start-card strong{ font-family:var(--font-brush); font-size:1.35rem; }
+.start-sub{ color:var(--ink-dan); margin:.5em 0 0; font-size:.9rem; }
+.list-heading{ margin:14px 4px 6px; color:var(--ink-dan); font-size:.86rem; }
+
+/* 學習連續里程碑 */
+@keyframes milestone-in{ 0%{ transform:scale(.6); opacity:0; } 40%{ transform:scale(1.04); opacity:1; } 100%{ transform:scale(1); opacity:1; } }
+.streak-milestone{ text-align:center; font-family:var(--font-brush); font-size:1.15rem; color:#fff; background:linear-gradient(90deg,var(--yan),var(--zhu)); animation:milestone-in .5s ease-out; }
+
+/* 回訪狀態卡：續玩／待複習／錯題本 */
+.home-status-wrap{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+.home-status{ flex:1 1 30%; min-width:150px; display:flex; align-items:center; gap:10px; text-align:left; padding:13px 14px; border:1px solid var(--line); border-radius:14px; background:var(--paper); cursor:pointer; transition:transform .1s,box-shadow .15s; font:inherit; color:inherit; }
+.home-status:hover{ transform:translateY(-2px); box-shadow:var(--shadow-paper); }
+.home-status .hs-icon{ font-size:1.25rem; }
+.home-status .hs-text{ display:flex; flex-direction:column; }
+.home-status .hs-text b{ color:var(--ink-nong); font-size:.95rem; }
+.home-status .hs-text small{ color:var(--ink-dan); font-size:.74rem; margin-top:2px; }
+.home-continue{ border-left:4px solid var(--qing-shi); }
+.home-due{ border-left:4px solid var(--dai); }
+.home-wrong{ border-left:4px solid var(--zhu); }
+
+/* 文名／道行段位條 */
+.renown-bar{ padding:13px 15px; }
+.renown-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.renown-name{ font-family:var(--font-brush); font-size:1.1rem; color:var(--zhu); }
+.renown-name small{ font-family:var(--font-ui); color:var(--ink-dan); font-size:.78rem; }
+.renown-tier{ font-size:.78rem; color:var(--ink-dan); white-space:nowrap; }
+.renown-track{ display:block; height:10px; border-radius:999px; background:var(--paper-aged); overflow:hidden; margin:8px 0 6px; }
+.renown-fill{ display:block; height:100%; background:linear-gradient(90deg,var(--dai),var(--zhu)); }
+.renown-foot{ font-size:.78rem; color:var(--ink-dan); }
+
+/* 心情選文 */
+.mood-picker{ padding:13px 15px; }
+.mood-title{ font-size:.9rem; color:var(--ink-zhong); margin:0 0 8px; font-family:var(--font-brush); }
+.mood-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.mood-chip{ padding:.35em .85em; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-zhong); font-size:.85rem; cursor:pointer; transition:background .15s; }
+.mood-chip:hover{ background:var(--paper-aged); }
+.mood-chip.active{ background:var(--yan); color:#fff; border-color:var(--yan); }
+.mood-hint{ margin:8px 0 0; font-size:.82rem; color:var(--ink-dan); }
+.mood-clear{ border:none; background:none; color:var(--zhu); cursor:pointer; text-decoration:underline; font-size:.82rem; }
+
+/* 選文清單「就差 N 題」nudge */
+.badge-nudge{ display:inline-block; padding:.15em .55em; border-radius:6px; font-size:.72rem; background:var(--zhu); color:#fff; }
+
+/* 班級文氣進度條 */
+.class-goal{ padding:13px 15px; }
+.cg-title{ font-family:var(--font-brush); font-size:1rem; color:var(--ink-zhong); margin:0 0 8px; }
+.cg-title small{ font-family:var(--font-ui); color:var(--ink-dan); font-size:.76rem; }
+.cg-track{ display:block; height:12px; border-radius:999px; background:var(--paper-aged); overflow:hidden; }
+.cg-fill{ display:block; height:100%; background:linear-gradient(90deg,var(--qing-shi),var(--dai)); }
+.cg-foot{ font-size:.8rem; color:var(--ink-zhong); margin:6px 0 0; }
+
+/* 備份／還原 */
+.dash-backup-note{ font-size:.82rem; color:var(--ink-dan); }
+.dash-backup-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+.dash-backup-btns button{ font-size:.82rem; padding:.45em .9em; }
+.dash-backup-box{ width:100%; min-height:64px; margin-top:8px; font-size:.72rem; border:1px solid var(--line); border-radius:8px; padding:6px; box-sizing:border-box; }
+
+/* 此篇之憂 */
+.worry-card{ background:linear-gradient(180deg,var(--paper-warm),var(--paper)); border-left:4px solid var(--yan); }
+.worry-label{ font-size:.76rem; color:var(--yan); letter-spacing:.1em; margin:0 0 .3em; }
+.worry-ancient{ font-family:var(--font-read); font-size:1.02rem; color:var(--ink-nong); margin:.1em 0 .4em; line-height:1.6; }
+.worry-echo{ color:var(--ink-dan); font-size:.9rem; margin:0; }
+
+/* ① 短回合結算卡 */
+.settle-card{ text-align:center; padding:22px 18px; }
+.settle-card h3{ margin:.1em 0 .5em; font-family:var(--font-brush); }
+.settle-stats{ display:flex; justify-content:center; gap:22px; margin:.3em 0; }
+.settle-stat{ display:flex; flex-direction:column; }
+.settle-stat b{ font-size:1.6rem; color:var(--zhu); font-family:var(--font-brush); line-height:1.1; }
+.settle-stat small{ font-size:.74rem; color:var(--ink-dan); }
+.settle-mastery{ color:var(--ink-zhong); font-size:.9rem; margin:.5em 0; }
+.settle-perfect{ background:linear-gradient(180deg,#fff8e8,var(--paper)); box-shadow:0 0 0 2px var(--zhu-light) inset, var(--shadow-lift); }
+.settle-perfect-badge{ display:inline-block; margin:.2em 0 .5em; padding:.2em .9em; border-radius:999px; background:var(--zhu); color:#fff; font-size:.85rem; }
+.settle-btns{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
+.settle-btns button{ flex:1 1 40%; }
+
+/* ⑨ 答錯自我歸因 */
+.self-explain{ margin-top:10px; padding:12px; border:1px dashed var(--ink-qing); border-radius:12px; background:var(--paper-warm); }
+.self-explain .se-q{ font-size:.9rem; color:var(--ink-zhong); margin:0 0 8px; }
+.se-opts{ display:flex; flex-wrap:wrap; gap:6px; }
+.se-btn{ padding:.5em .9em; border:1px solid var(--ink-qing); border-radius:10px; background:var(--paper); color:var(--ink-nong); cursor:pointer; font-size:.86rem; transition:transform .08s,background .15s; }
+.se-btn:hover{ background:var(--paper-aged); transform:translateY(-1px); }
+
+/* ⑧ 能力標籤專練 */
+.quiz-tag-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
+.quiz-tag-label{ font-size:.8rem; color:var(--ink-dan); }
+.quiz-tag-btn{ padding:.3em .7em; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-dan); font-size:.8rem; cursor:pointer; }
+.quiz-tag-btn.active{ background:var(--dai); color:#fff; border-color:var(--dai); }
+
+/* ⑤ 連對慶祝分級（combo-banner 基底已存在，這裡加分級樣式） */
+.combo-banner.combo-t0{ color:var(--qing-shi); font-size:1.5rem; }
+.combo-banner.combo-t1{ color:var(--dai); font-size:1.9rem; }
+.combo-banner.combo-t2{ color:var(--zhu); font-size:2.4rem; }
+.combo-banner.combo-t3{ color:var(--zhu-light); font-size:3rem; text-shadow:0 2px 10px rgba(158,59,44,.35); }
+
+/* 答對放大微反應 */
+@keyframes pop-in{ 0%{ transform:scale(.94); } 50%{ transform:scale(1.05); } 100%{ transform:scale(1); } }
+.options button.pop{ animation:pop-in .22s ease-out; }
+/* 對戰低血量脈動 */
+@keyframes hp-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
+.hp-fill.low{ background:var(--zhu); animation:hp-pulse .9s ease-in-out infinite; }
+
+/* ④ 掉寶開盒揭曉 */
+@keyframes drop-rise{ 0%{ transform:translate(-50%,-30%) scale(.7); opacity:0; } 25%{ transform:translate(-50%,-50%) scale(1.1); opacity:1; } 80%{ opacity:1; } 100%{ transform:translate(-50%,-58%) scale(1); opacity:0; } }
+.drop-reveal{ position:fixed; left:50%; top:44%; z-index:60; pointer-events:none; text-align:center; animation:drop-rise 1.9s ease-out forwards; }
+.drop-inner{ padding:14px 22px; border-radius:16px; background:rgba(247,242,231,.96); box-shadow:var(--shadow-lift); border:1px solid var(--ink-qing); }
+.drop-spark{ font-size:1.6rem; }
+.drop-got{ margin:.2em 0 .1em; font-size:.82rem; color:var(--ink-dan); }
+.drop-name{ margin:0; font-weight:800; font-family:var(--font-brush); font-size:1.3rem; }
+.drop-tier-1 .drop-inner{ box-shadow:0 0 0 2px var(--qing-shi-light) inset, var(--shadow-lift); }
+.drop-tier-2 .drop-inner{ box-shadow:0 0 0 2px var(--zhu) inset, var(--shadow-lift); }
+
+/* 對戰結束畫面 */
+.battle-end{ text-align:center; padding:22px 18px; }
+.battle-end h3{ font-family:var(--font-brush); margin:.1em 0 .3em; }
+.battle-end.win h3{ color:var(--zhu); }
+.battle-drop{ color:var(--zhu); font-weight:600; }
+.battle-end-btns{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
+.battle-end-btns button{ flex:1 1 40%; }
+
+/* ⑨ 閃卡自譯／朗讀／SRS 自評 */
+.fc-tts{ margin-top:10px; padding:.35em .8em; border:1px solid var(--ink-qing); border-radius:10px; background:var(--paper); cursor:pointer; font-size:.85rem; }
+.fc-translation{ font-family:var(--font-read); }
+.fc-srs{ margin-top:12px; text-align:center; }
+.fc-srs-q{ font-size:.88rem; color:var(--ink-dan); margin:0 0 6px; }
+.fc-srs-btns{ display:flex; gap:8px; justify-content:center; }
+.fc-srs-btns .se-btn{ flex:1 1 30%; }
+
+/* 老師戰情室：逐題冷熱 */
+.rt-hotspots{ margin-top:12px; }
+.rt-hot-title{ font-size:.85rem; color:var(--ink-zhong); margin:0 0 6px; }
+.rt-hot-title small{ color:var(--ink-dan); font-size:.76rem; }
+.rt-hot-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(50px,1fr)); gap:6px; }
+.rt-hot-cell{ text-align:center; padding:6px 2px; border-radius:8px; font-size:.7rem; background:var(--paper-aged); color:var(--ink-zhong); }
+.rt-hot-cell b{ display:block; font-size:.78rem; }
+.rt-hot-cell.cold{ background:var(--zhu); color:#fff; }
+.rt-hot-cell.hot-good{ background:var(--dai); color:#fff; }
+
+/* 解憂簿（文豪錄）強化 */
+.wenhao-header h3,.wenhao-finale h3{ margin:.1em 0 .3em; font-family:var(--font-brush); }
+.wenhao-progress{ height:10px; border-radius:999px; background:var(--paper-aged); overflow:hidden; margin-top:6px; }
+.wenhao-progress-fill{ height:100%; background:linear-gradient(90deg,var(--yan),var(--zhu)); }
+.wenhao-finale{ background:linear-gradient(180deg,#fff8e8,var(--paper)); box-shadow:0 0 0 2px var(--zhu-light) inset, var(--shadow-paper); }
+.wenhao-finale p{ line-height:1.7; }
+.wenhao-reunion{ margin-top:8px; padding:8px 10px; border-top:1px dashed var(--ink-qing); font-size:.82rem; color:var(--yan); font-family:var(--font-read); line-height:1.5; }

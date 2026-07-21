@@ -14,6 +14,15 @@ const liveKey = (code) => `wy_rt:live:${code}`;
 const rosterKey = (code) => `wy_rt:live:${code}:roster`;
 
 const clamp = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+// ISO 週鍵（YYYY-Www）——班級集體目標每週歸零重來，給每週一個回站的約定
+function weekKey(d = new Date()) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
+  return `${t.getUTCFullYear()}-W${String(wk).padStart(2, '0')}`;
+}
 const stripBad = (x) => String(x ?? '').replace(/[<>&"']/g, '');
 const BAD_WORDS = /笨蛋|白癡|白痴|智障|廢物|去死|三小|幹你|靠北|媽的|垃圾|腦殘|fuck|shit|bitch|asshole|idiot|stupid|retard/i;
 const okNick = (n) => typeof n === 'string' && n.trim().length >= 1 && n.trim().length <= 12 && !BAD_WORDS.test(n);
@@ -110,6 +119,23 @@ export async function onRequestPost({ request, env }) {
       await kv.hset(rosterKey(code), { [nk]: JSON.stringify(cur) });
       await kv.expire(rosterKey(code), TTL);
       return reply(request, { ok: 1 });
+    }
+
+    // 班級集體目標：全班本週累計答對題數。白帽——只 incr（+1/題），不記個人、不做班際排行。
+    // { op:'goal', code, n } n=本次要加的答對數（前端節流批量上報，clamp 防灌）；回 { ok, count, weekKey }
+    // { op:'goalState', code } 只讀當週累計；回 { ok, count, weekKey }
+    if (op === 'goal' || op === 'goalState') {
+      if (!okCode(code)) return reply(request, { ok: 0, error: 'bad req' }, 400);
+      const wk = weekKey();
+      const gk = `wy_rt:goal:${code}:${wk}`;
+      if (op === 'goalState') {
+        const v = await kv.get(gk);
+        return reply(request, { ok: 1, count: Number(v) || 0, weekKey: wk });
+      }
+      const add = clamp(body.n, 20) || 1; // 單次上報上限 20，防一次灌大量
+      let count = 0;
+      for (let i = 0; i < add; i++) count = await kv.incr(gk, 8 * 86400); // 週計數存 8 天
+      return reply(request, { ok: 1, count, weekKey: wk });
     }
 
     if (op === 'roster') {

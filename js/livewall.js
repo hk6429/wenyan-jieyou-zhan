@@ -23,6 +23,23 @@ const WYLiveWall = (() => {
     ];
   }
 
-  return { safeBoard, buildHerald };
+  // 老師戰情室：把每位學生的逐題對錯字串（hist，'1010…'，index 0 = 第1題）聚成「逐題正確率」。
+  // 回 [{ qNo, correct, answered, pct, cold }]，cold=正確率<50%（隔天課堂該講評的題）。qn=本場題數。
+  function questionHotspots(rows, qn) {
+    const n = Math.max(0, Math.round(qn) || 0);
+    const out = [];
+    for (let j = 0; j < n; j++) {
+      let correct = 0, answered = 0;
+      for (const r of rows) {
+        const h = String(r.hist || '');
+        if (j < h.length) { answered++; if (h[j] === '1') correct++; }
+      }
+      const pct = answered ? Math.round(correct / answered * 100) : null;
+      out.push({ qNo: j + 1, correct, answered, pct, cold: pct !== null && pct < 50 });
+    }
+    return out;
+  }
+
+  return { safeBoard, buildHerald, questionHotspots };
 })();
 if (typeof globalThis !== 'undefined') globalThis.WYLiveWall = WYLiveWall;
