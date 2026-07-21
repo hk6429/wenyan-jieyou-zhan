@@ -799,7 +799,8 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 /* ⑨ 閃卡自譯／朗讀／SRS 自評 */
 .fc-tts{ margin-top:10px; padding:.35em .8em; border:1px solid var(--ink-qing); border-radius:10px; background:var(--paper); cursor:pointer; font-size:.85rem; }
 .fc-translation{ font-family:var(--font-read); }
-.fc-srs{ margin-top:12px; text-align:center; }
+.fc-srs{ margin-top:12px; text-align:center; display:none; }
+.fc-srs.show{ display:block; }
 .fc-srs-q{ font-size:.88rem; color:var(--ink-dan); margin:0 0 6px; }
 .fc-srs-btns{ display:flex; gap:8px; justify-content:center; }
 .fc-srs-btns .se-btn{ flex:1 1 30%; }

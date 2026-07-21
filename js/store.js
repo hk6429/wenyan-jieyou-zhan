@@ -22,7 +22,8 @@ const WYStore = (() => {
   }
 
   function save(state) {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    // 隱私模式/配額爆掉時 setItem 會拋錯——吞掉以免作答中途整站半殘（進度只是無法持久，當次仍可玩）。
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* 隱私模式或超出配額：略過持久化 */ }
   }
 
   function getTextState(textId) {

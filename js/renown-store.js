@@ -17,12 +17,13 @@ const WYRenown = (() => {
     { name: '文宗', at: 2200 },
   ];
 
-  // 文名值：精通篇數×100（主軸）＋累計答題數×1（勤學）＋收藏加分（文魄/文房，若有）
+  // 文名值：精通篇數×100（主軸）＋累計「答對」數×1（勤學）＋收藏加分（文魄/文房，若有）
+  // 白帽：勤學分綁「答對」而非「作答」，否則亂猜/答錯也能灌段位＝操作次數刷數值。
   function score() {
     let s = 0;
     try {
       s += WYStore.allMastered().length * 100;
-      s += WYStore.typeStats().reduce((a, x) => a + x.total, 0) * 1;
+      s += WYStore.typeStats().reduce((a, x) => a + (x.correct || 0), 0) * 1;
     } catch { /* store 未載入 */ }
     // 文魄數（合契）與文房件數（市集）若存在則各加分——收斂多系統，但權重壓低於精通
     try { if (typeof WYFusionStore !== 'undefined' && WYFusionStore.ownedCount) s += WYFusionStore.ownedCount() * 30; } catch { /* 無 */ }

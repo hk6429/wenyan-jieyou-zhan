@@ -9,24 +9,28 @@ const CT = globalThis.WYCaotangStore;
 // 用真實 27 篇資料當固定樣本（掛軸/名句池要對真原文驗證）
 const TEXTS = JSON.parse(readFileSync(new URL('../data/texts.json', import.meta.url)));
 
-// 造一份進度物件：mastered = { id: [correct, total] }
+// 四題型各≥2 的廣度（精通門檻要求，與核心 computeMastered 一致）
+const FULL_TYPES = { char: { correct: 2, total: 2 }, sentence: { correct: 2, total: 2 }, gist: { correct: 2, total: 2 }, theme: { correct: 2, total: 2 } };
+// 造一份進度物件：mastered = { id: [correct, total] }。total>=10 者補上四題型廣度使其達精通門檻。
 function progressOf(map) {
   const texts = {};
   for (const [id, [correct, total]] of Object.entries(map)) {
-    texts[id] = { seen: total, correct, total };
+    texts[id] = { seen: total, correct, total, types: total >= 10 ? FULL_TYPES : {} };
   }
   return { texts };
 }
-// 讓某篇「精通」：total=10, correct=9 → 90% 達標
+// 讓某篇「精通」：total=10, correct=9 → 90% 且四題型各≥2
 const M = [9, 10];
-// 讓某篇「未精通」：total=4, correct=4 → 題數不足 8
+// 讓某篇「未精通」：total=4, correct=4 → 題數不足 10
 const NM = [4, 4];
 
-test('isMastered：需 total>=8 且答對率>=80%', () => {
-  assert.equal(CT.isMastered({ correct: 9, total: 10 }), true);
-  assert.equal(CT.isMastered({ correct: 8, total: 10 }), true);  // 8/10=0.8 剛好達標
-  assert.equal(CT.isMastered({ correct: 4, total: 4 }), false);  // 題數不足
-  assert.equal(CT.isMastered({ correct: 7, total: 10 }), false); // 70%
+test('isMastered：需 total>=10、答對率>=80% 且四題型各>=2（白帽：不得只刷單一題型）', () => {
+  assert.equal(CT.isMastered({ correct: 9, total: 10, types: FULL_TYPES }), true);
+  assert.equal(CT.isMastered({ correct: 8, total: 10, types: FULL_TYPES }), true);  // 8/10=0.8 剛好達標
+  assert.equal(CT.isMastered({ correct: 9, total: 10 }), false);                    // 缺四題型廣度
+  assert.equal(CT.isMastered({ correct: 20, total: 20, types: { char: { correct: 20, total: 20 } } }), false); // 只刷字義
+  assert.equal(CT.isMastered({ correct: 8, total: 8, types: FULL_TYPES }), false);  // 題數不足 10
+  assert.equal(CT.isMastered({ correct: 7, total: 10, types: FULL_TYPES }), false); // 70%
 });
 
 test('三院落 derive 百分比：J/S 精通比例＋藏書閣答題量', () => {

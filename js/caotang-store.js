@@ -91,9 +91,14 @@
     return t || { seen: 0, correct: 0, total: 0 };
   }
 
-  // 自己重算精通（不信任外部旗標）：作答滿 8 題且答對率 >= 80%
+  // 精通判準必須與核心 WYStore.computeMastered 完全一致（白帽底線：不得在終局/成就面偷降門檻）：
+  // 總數≥10、答對率≥80%、且四題型（字義/句義/段旨/篇章）各≥2 題——防止只狂刷單一題型就點亮
+  // 山門十境／掛軸／「精通全27篇」成就並對家長老師謊報精通。
+  const CT_QUIZ_TYPES = ['char', 'sentence', 'gist', 'theme'];
   function isMastered(stat) {
-    return stat.total >= 8 && stat.correct / stat.total >= 0.8;
+    if (!stat || stat.total < 10 || !(stat.correct / stat.total >= 0.8)) return false;
+    const types = stat.types || {};
+    return CT_QUIZ_TYPES.every((ty) => (types[ty] && types[ty].total >= 2));
   }
 
   function totalCorrect(progress) {

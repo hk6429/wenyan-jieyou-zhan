@@ -5,6 +5,15 @@ const WYQuiz = (() => {
     texts = allTexts;
   }
 
+  // 以題目 id 的字元雜湊當各題「獨立」洗牌種子（base 混入回合 seed）。
+  // 修正舊版 seed+q.id.length：id 長度只有 5/6 兩種，一回合僅套兩種排列，
+  // 配合題庫 80% 正解落 index 0，學生看一兩題高亮就能「認位置」破解、不必讀懂。
+  function optSeed(id, base) {
+    let h = (base >>> 0) || 0;
+    for (let i = 0; i < id.length; i++) h = ((h * 31 + id.charCodeAt(i)) >>> 0);
+    return h;
+  }
+
   function seededShuffle(arr, seed) {
     let s = seed;
     const rnd = () => {
@@ -37,7 +46,7 @@ const WYQuiz = (() => {
     if (n && n > 0) qs = qs.slice(0, n);
     if (ramp) qs.sort((a, b) => (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9));
     qs = qs.map((q) => {
-      const optOrder = seededShuffle([0, 1, 2, 3], seed + q.id.length);
+      const optOrder = seededShuffle([0, 1, 2, 3], optSeed(q.id, seed));
       return {
         id: q.id,
         stem: q.stem,
@@ -116,7 +125,7 @@ const WYQuiz = (() => {
       for (const t of texts) {
         const q = t.questions.find((x) => x.id === qId);
         if (q) {
-          const optOrder = seededShuffle([0, 1, 2, 3], seed + q.id.length + i);
+          const optOrder = seededShuffle([0, 1, 2, 3], optSeed(q.id, seed + i));
           out.push({
             id: q.id, textId: t.id, stem: q.stem,
             options: optOrder.map((k) => q.options[k]),

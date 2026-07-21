@@ -86,8 +86,17 @@ function floatInk(amount, elOrSel) {
 }
 
 async function boot() {
-  const res = await fetch('data/texts.json');
-  TEXTS = await res.json();
+  try {
+    const res = await fetch('data/texts.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    TEXTS = await res.json();
+  } catch (e) {
+    // 離線／載入失敗不再整站白畫面：給明確訊息＋重試鍵（教育站常在校園弱網下開）
+    if (app) app.innerHTML = '<div class="card" style="text-align:center;padding:28px;"><h3>📡 載入題庫失敗</h3><p style="color:var(--ink-dan);">可能是網路不穩或離線。請確認連線後再試一次。</p><button class="primary" id="bootRetry">重新載入</button></div>';
+    const rb = document.getElementById('bootRetry');
+    if (rb) rb.onclick = () => location.reload();
+    return;
+  }
   WYFlashcard.init(TEXTS);
   WYQuiz.init(TEXTS);
   WYWenhao.init(TEXTS);
@@ -494,23 +503,25 @@ function drawFlashcard() {
           </div>
         </div>
       </div>
-      ${flashcardFlipped ? `
-      <div class="fc-srs" id="fcSrs">
+      <div class="fc-srs ${flashcardFlipped ? 'show' : ''}" id="fcSrs">
         <p class="fc-srs-q">剛剛自己譯的，跟答案差多少？</p>
         <div class="fc-srs-btns">
-          <button class="se-btn" data-g="1">又忘了</button>
-          <button class="se-btn" data-g="3">有印象</button>
-          <button class="se-btn" data-g="5">很熟</button>
+          <button class="se-btn" data-g="again">又忘了</button>
+          <button class="se-btn" data-g="hard">有印象</button>
+          <button class="se-btn" data-g="good">很熟</button>
         </div>
-      </div>` : ''}
+      </div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="primary" id="prevBtn">上一張</button>
         <button class="primary" id="nextBtn">下一張</button>
       </div>
     </div>`;
+  // 翻面只切 class（觸發 CSS 3D flip 動畫）＋顯示自評列，不整頁重建，否則動畫永遠不播。
   const flipCard = () => {
     flashcardFlipped = !flashcardFlipped;
-    drawFlashcard();
+    document.getElementById('flashcardEl').classList.toggle('flipped', flashcardFlipped);
+    const s = document.getElementById('fcSrs');
+    if (s) s.classList.toggle('show', flashcardFlipped);
   };
   document.getElementById('flashcardEl').onclick = (e) => { if (e.target.closest('.fc-tts')) return; flipCard(); };
   document.getElementById('flashcardEl').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); } });
@@ -519,9 +530,11 @@ function drawFlashcard() {
   const srs = document.getElementById('fcSrs');
   if (srs) srs.querySelectorAll('.se-btn').forEach((btn) => {
     btn.onclick = () => {
-      // 自評答案 → SM-2 排程（qId=fc-<textId>-<segNo>）：把閃卡納入「今日該複習」的統一佇列
-      WYStore.recordItem(card.qId, Number(btn.dataset.g), card.textId);
-      WYSound.correct();
+      // 自評答案 → SM-2 排程（qId=fc-<textId>-<segNo>）：grade 必須是 again/hard/good 字串，
+      // 否則 _recordItemInto 的 grade 比對會把「又忘了」誤當「很熟」（數字永遠落 good 分支）。
+      const g = btn.dataset.g;
+      WYStore.recordItem(card.qId, g, card.textId);
+      g === 'again' ? WYSound.wrong() : WYSound.correct(); // 回饋要與自評一致，忘了不放答對音
       flashcardFlipped = false;
       WYFlashcard.next();
       drawFlashcard();

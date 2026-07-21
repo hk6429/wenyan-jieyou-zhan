@@ -120,6 +120,30 @@ test('quiz.buildReviewQuiz：跨篇 qId 解析回題目，每題帶自己的 tex
   assert.ok(rev.questions.every((q) => q.textId));   // 複習卷每題須自帶 textId
 });
 
+test('quiz 選項洗牌：正解顯示位置分散於全篇（防「認位置」破解，P0）', () => {
+  const Q = loadQuiz();
+  Q.init(TEXTS);
+  // 某篇全部題目：正解落點應散佈於 0~3，不可全部集中同一位置
+  const quiz = Q.buildQuiz('t06', { seed: 123 });
+  const positions = new Set(quiz.questions.map((q) => q.answerIdx));
+  assert.ok(positions.size >= 3, `正解顯示位置應分散，實得 ${[...positions]}`);
+  // 兩題 id 不同但原始 answer 同 0 時，顯示位置不應被綁死成同一格
+  const pool = TEXTS.find((t) => t.id === 't06').questions.filter((q) => q.answer === 0).slice(0, 4);
+  if (pool.length >= 2) {
+    const disp = pool.map((q) => Q.buildQuiz('t06', { seed: 5 }).questions.find((x) => x.id === q.id)?.answerIdx);
+    assert.ok(new Set(disp).size >= 2, `同為原始 index0 的題，顯示位置應被打散，實得 ${disp}`);
+  }
+});
+
+test('SRS 字串 grade 契約：again 進錯題本並當日到期、good 排到未來（閃卡自評依賴此契約）', () => {
+  const S = loadStore(memStorage());
+  S.recordItem('fc-t06-1', 'again', 't06');
+  assert.ok(S.wrongItems().includes('fc-t06-1'));      // 又忘了 → 錯題本
+  assert.equal(S.dueItems().some((x) => x.qId === 'fc-t06-1'), true); // 當日到期
+  S.recordItem('fc-t06-1', 'good', 't06');
+  assert.ok(!S.wrongItems().includes('fc-t06-1'));      // 很熟 → 移出錯題本
+});
+
 test('livewall.questionHotspots：逐題聚合正確率，<50% 標記 cold', () => {
   const W = loadLiveWall();
   const rows = [
