@@ -6,6 +6,7 @@ let currentQuizType = null;
 let currentQuizCombo = 0;
 let currentBattle = null;
 let segTabPreference = 'translation';
+let pendingQuizNote = null; // 從選文詳情頁「對戰作者」但尚未解鎖時，導去自測並提示
 
 const app = document.getElementById('app');
 const tabButtons = document.querySelectorAll('nav.tabs button');
@@ -69,11 +70,15 @@ async function boot() {
 
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
-    tabButtons.forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
+    setActiveTab(btn.dataset.tab);
     renderTab(btn.dataset.tab);
   });
 });
+
+// 只更新導覽列高亮（供選文詳情頁的「自測這篇／對戰作者」以程式切換分頁時同步高亮）
+function setActiveTab(tab) {
+  tabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+}
 
 function renderTab(tab) {
   updateInkHud();
@@ -186,8 +191,40 @@ function renderTextDetail(t) {
           ${SEG_TABS.map((tab) => `<button class="seg-tab-btn ${tab.key === segTabPreference ? 'active' : ''}" data-tab="${tab.key}">${tab.label}</button>`).join('')}
         </div>
         <div class="seg-tab-content" data-seg="${i}">${renderSegTabContent(seg, segTabPreference)}</div>
-      </div>`).join('')}`;
+      </div>`).join('')}
+    <div class="card detail-cta">
+      <p class="detail-cta-hint">讀完了？直接針對這一篇接續練功：</p>
+      <div class="detail-cta-btns">
+        <button class="primary" id="quizThis">📝 自測這篇</button>
+        <button class="primary" id="battleThis">⚔️ 對戰${t.author}</button>
+      </div>
+    </div>`;
   document.getElementById('backToList').onclick = renderList;
+  document.getElementById('quizThis').onclick = () => {
+    currentTextId = t.id;
+    currentQuizType = null;
+    pendingQuizNote = null;
+    setActiveTab('quiz');
+    renderQuiz();
+  };
+  document.getElementById('battleThis').onclick = () => {
+    const entry = WYBattle.unlockedRoster().find((r) => r.unlockText === t.id);
+    if (entry && entry.unlocked) {
+      currentBattle = WYBattle.newBattle(entry.id);
+      currentTextId = t.id;
+      currentQuiz = WYQuiz.buildQuiz(t.id, {});
+      currentQIdx = 0;
+      setActiveTab('battle');
+      drawBattle();
+    } else {
+      // 尚未解鎖：導去自測這篇並提示（對應篇答對率達 80% 才能對戰作者）
+      currentTextId = t.id;
+      currentQuizType = null;
+      pendingQuizNote = `先把〈${t.title}〉自測到答對率 80%，就能對戰 ${t.author}。`;
+      setActiveTab('quiz');
+      renderQuiz();
+    }
+  };
   app.querySelectorAll('.seg-tabs').forEach((tabsEl) => {
     const segIdx = tabsEl.dataset.seg;
     const contentEl = app.querySelector(`.seg-tab-content[data-seg="${segIdx}"]`);
@@ -278,8 +315,11 @@ function renderQuiz() {
 }
 
 function drawQuiz() {
-  const typeFilterHtml = `
+  const noteHtml = pendingQuizNote ? `<div class="card quiz-note">💡 ${pendingQuizNote}</div>` : '';
+  pendingQuizNote = null; // 只提示一次
+  const typeFilterHtml = noteHtml + `
     <div class="card">
+      <p class="quiz-focus">📖 自測：《${currentQuiz.title}》　<button class="link-back" id="quizPickOther">換一篇</button></p>
       <p style="font-size:.8rem;color:#6b5f4f;margin:0 0 6px;">練習題型（可先專攻單一題型打基礎）</p>
       <div class="quiz-type-tabs">
         ${QUIZ_TYPES.map((qt) => `<button class="quiz-type-btn ${qt.key === currentQuizType ? 'active' : ''}" data-type="${qt.key ?? ''}">${qt.label}</button>`).join('')}
@@ -351,6 +391,8 @@ function bindQuizTypeTabs() {
       renderQuiz();
     });
   });
+  const pick = document.getElementById('quizPickOther');
+  if (pick) pick.onclick = () => { setActiveTab('list'); renderList(); };
 }
 
 function renderBattle() {

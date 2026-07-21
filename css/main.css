@@ -564,6 +564,14 @@ button.primary:active { transform: scale(.97); }
 
 .mkt-yanling-head .mkt-sub { margin: 0; }
 
+.detail-cta { border-top: 2px solid var(--zhu); text-align: center; }
+.detail-cta-hint { margin: 0 0 10px; color: var(--ink-zhong); font-size: .9rem; }
+.detail-cta-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.detail-cta-btns button { flex: 1 1 40%; min-width: 130px; }
+.quiz-focus { font-size: 1rem; color: var(--ink-jiao); margin: 0 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quiz-focus .link-back { font-size: .8rem; }
+.quiz-note { border-left: 4px solid var(--zhu); color: var(--ink-zhong); font-size: .9rem; }
+
 @media (max-width: 480px) {
   main { padding: 10px; }
   header h1 { font-size: 1.6rem; }
