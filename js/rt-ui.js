@@ -27,11 +27,11 @@ const WYRt = (() => {
     try { localStorage.setItem(NICK_KEY, n); } catch { /* 隱私模式：略過 */ }
   }
 
-  // 本機裝置識別碼（3 碼）：讓科舉榜上同名同學不會被合併成同一筆／被冒名。
+  // 本機裝置識別碼（6 碼）：讓同名同學不會被合併。
   function deviceTag() {
     try {
       let t = localStorage.getItem('wy_rt_devtag');
-      if (!t) { t = Math.floor(Math.random() * 46656).toString(36).padStart(3, '0'); localStorage.setItem('wy_rt_devtag', t); }
+      if (!t || t.length < 4) { t = Math.floor(Math.random() * 2176782336).toString(36).padStart(6, '0'); localStorage.setItem('wy_rt_devtag', t); }
       return t;
     } catch { return '000'; }
   }
@@ -53,7 +53,7 @@ const WYRt = (() => {
       ${backBar()}
       <div class="card">
         <h3>先取一個擂台暱稱</h3>
-        <p class="rt-sub">1–12 字，會顯示在對戰與科舉榜上。</p>
+        <p class="rt-sub">1–12 字，會公開顯示在對戰與科舉榜上；請勿使用真實姓名。</p>
         <input class="rt-input" id="rt-nick-in" maxlength="12" placeholder="你的暱稱" value="${esc(getNick())}">
         <button class="rt-btn rt-btn--main" id="rt-nick-ok">確定</button>
         <div class="rt-err" id="rt-nick-err"></div>
@@ -362,10 +362,12 @@ const WYRt = (() => {
     if (B.finished) return;
     B.finished = true; clearTimers();
     // 賽季計分（本機＋後端）
-    const s = SEASON().recordResult(SEASON().today(), verdict);
-    if (verdict !== 'draw') api('/api/rt-room', { op: 'seasonAdd', nick: seasonNick(), pts: verdict === 'win' ? SEASON().WIN_PTS : SEASON().LOSE_PTS });
+    const s = SEASON().recordResult(SEASON().today(), verdict, B.correct);
+    api('/api/rt-room', { op: 'seasonToken', code: B.room.code, role: B.room.role, nick: seasonNick(), verdict, classCode: WYStore.getClassCode() }).then((tok) => {
+      if (tok && tok.seasonToken) api('/api/rt-room', { op: 'seasonAdd', seasonToken: tok.seasonToken });
+    });
     const head = verdict === 'win' ? '🎉 得勝！硯靈為你添墨' : verdict === 'lose' ? '📖 惜敗，把字記牢下次贏回' : '⚖️ 平手，勢均力敵';
-    const whitehat = verdict === 'lose' ? '<p class="rt-sub">科舉不倒扣——敗也記 5 分，勤能補拙。</p>' : '';
+    const whitehat = verdict === 'lose' ? '<p class="rt-sub">惜敗場只留參與徽章，不加功名分；功名只算真實答對與勝場。</p>' : '';
     shell(`
       <div class="card rt-result rt-result--${verdict}">
         <h2>${head}</h2>
@@ -560,9 +562,9 @@ const WYRt = (() => {
       root.querySelector('#rt-bot-again').addEventListener('click', () => botScreen());
       return;
     }
-    const r = await api('/api/rt-room', { op: 'challengeResult', code: ch.code, nick: B.room.nick, score: B.dmg });
-    const s = SEASON().recordResult(SEASON().today(), verdict);
-    if (verdict !== 'draw') api('/api/rt-room', { op: 'seasonAdd', nick: seasonNick(), pts: verdict === 'win' ? SEASON().WIN_PTS : SEASON().LOSE_PTS });
+    const r = await api('/api/rt-room', { op: 'challengeResult', code: ch.code, nick: B.room.nick, score: B.dmg, correct: B.correct, classCode: WYStore.getClassCode() });
+    const s = SEASON().recordResult(SEASON().today(), verdict, B.correct);
+    if (r && r.seasonToken) api('/api/rt-room', { op: 'seasonAdd', seasonToken: r.seasonToken });
     shell(`
       <div class="card rt-result rt-result--${verdict}">
         <h2>${head}</h2>
@@ -585,7 +587,7 @@ const WYRt = (() => {
       <div class="card">
         <h3>📡 全班文會（學生）</h3>
         <p class="rt-sub">老師開場後，輸入班級碼與暱稱進場，全班同題搶答。</p>
-        <input class="rt-input" id="rt-live-code" maxlength="20" placeholder="班級碼" value="${esc(cls)}">
+        <input class="rt-input" id="rt-live-code" maxlength="8" placeholder="班級碼（例：5A03）" value="${esc(cls)}">
         <input class="rt-input" id="rt-live-nick" maxlength="12" placeholder="你的暱稱" value="${esc(getNick())}">
         <button class="rt-btn rt-btn--main" id="rt-live-enter">進場</button>
         <div class="rt-err" id="rt-live-err"></div>
@@ -593,10 +595,11 @@ const WYRt = (() => {
     `);
     bindBack();
     root.querySelector('#rt-live-enter').addEventListener('click', () => {
-      const code = (root.querySelector('#rt-live-code').value || '').trim();
+      const code = (root.querySelector('#rt-live-code').value || '').trim().toUpperCase();
       const nick = (root.querySelector('#rt-live-nick').value || '').trim().slice(0, 12);
       if (!code || !nick) { root.querySelector('#rt-live-err').textContent = '班級碼與暱稱都要填'; return; }
       setNick(nick);
+      if (!WYStore.setClassCode(code)) { root.querySelector('#rt-live-err').textContent = '班級碼需為 4–8 碼英數'; return; }
       liveStudentRun(code, nick);
     });
   }
@@ -641,7 +644,7 @@ const WYRt = (() => {
       st.answeredQ = st.curQ;
       const fb = root.querySelector('#rt-live-fb');
       if (fb) fb.textContent = correct ? '答對！等下一題…' : '答錯，等下一題…';
-      await api('/api/rt-live', { op: 'answer', code: st.code, nick: st.nick, qNo: st.curQ, correct });
+      await api('/api/rt-live', { op: 'answer', code: st.code, nick: st.nick, deviceTag: deviceTag(), qNo: st.curQ, answerIdx: v });
     }));
   }
 
@@ -673,7 +676,7 @@ const WYRt = (() => {
       ${backBar()}
       <div class="card">
         <h3>🧑‍🏫 主持全班文會</h3>
-        <input class="rt-input" id="rt-h-code" maxlength="20" placeholder="班級碼（例：五年三班）" value="${esc(cls)}">
+        <input class="rt-input" id="rt-h-code" maxlength="8" placeholder="班級碼（例：5A03）" value="${esc(cls)}">
         <input class="rt-input" id="rt-h-pin" inputmode="numeric" maxlength="8" placeholder="主持碼（4-8 位數，只你知道）">
         <div class="rt-scope-line">題數：
           <select id="rt-h-qn"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option></select>
@@ -685,15 +688,29 @@ const WYRt = (() => {
     `);
     bindBack();
     root.querySelector('#rt-h-start').addEventListener('click', async () => {
-      const code = (root.querySelector('#rt-h-code').value || '').trim();
+      const code = (root.querySelector('#rt-h-code').value || '').trim().toUpperCase();
       const pin = (root.querySelector('#rt-h-pin').value || '').trim();
       const qn = Number(root.querySelector('#rt-h-qn').value);
-      if (!code || !/^\d{4,8}$/.test(pin)) { root.querySelector('#rt-h-err').textContent = '班級碼＋4-8 位數主持碼'; return; }
+      if (!/^[A-Z0-9]{4,8}$/.test(code) || !/^\d{4,8}$/.test(pin)) { root.querySelector('#rt-h-err').textContent = '4–8 碼英數班級碼＋4–8 位數主持碼'; return; }
       const scope = readScope();
       const r = await api('/api/rt-live', { op: 'start', code, pin, qn, scope });
       if (!r) return degrade('開場');
-      if (!r.ok) { root.querySelector('#rt-h-err').textContent = r.error || '開場失敗'; return; }
-      liveHostPanel({ code, pin, qn, scope });
+      if (!r.ok) {
+        const err = root.querySelector('#rt-h-err');
+        err.innerHTML = `${esc(r.error || '開場失敗')}<div class="rt-result-btns"><button class="rt-btn" id="rt-h-reenter">重新進入主持面板</button><button class="rt-btn" id="rt-h-force">強制結束並重開</button></div>`;
+        root.querySelector('#rt-h-reenter').onclick = async () => {
+          const state = await api('/api/rt-live', { op: 'state', code });
+          if (!state || !state.live) return;
+          const qs = L().buildRounds(TEXTS, state.live.scope, state.live.seed, state.live.qn);
+          liveHostPanel({ code, pin, qn: state.live.qn, scope: state.live.scope, seed: state.live.seed, qs });
+        };
+        root.querySelector('#rt-h-force').onclick = async () => { await api('/api/rt-live', { op: 'end', code, pin }); liveHostScreen(); };
+        return;
+      }
+      const seed = r.live.seed;
+      const qs = L().buildRounds(TEXTS, scope, seed, qn);
+      await api('/api/rt-live', { op: 'key', code, pin, answerKey: qs.map((q) => q.answerIdx) });
+      liveHostPanel({ code, pin, qn, scope, seed, qs });
     });
   }
 
@@ -714,7 +731,8 @@ const WYRt = (() => {
           <div id="rt-h-herald"></div>
         </div>
       `);
-      bindBack();
+      const leave = root.querySelector('[data-back]');
+      if (leave) leave.addEventListener('click', async () => { await api('/api/rt-live', { op: 'end', code: h.code, pin: h.pin }); clearTimers(); home(); });
       const nx = root.querySelector('#rt-h-next');
       if (nx) nx.addEventListener('click', async () => { await api('/api/rt-live', { op: 'next', code: h.code, pin: h.pin }); });
       const en = root.querySelector('#rt-h-end');
@@ -739,12 +757,14 @@ const WYRt = (() => {
         // 老師戰情室：逐題正確率熱點（紅字＝全班正確率 <50%，隔天課堂優先講評）
         const hot = WALL().questionHotspots(rows, h.qn);
         const coldN = hot.filter((x) => x.cold).length;
+        const questions = h.qs || L().buildRounds(TEXTS, h.scope, h.seed, h.qn);
         const hotHtml = rows.length ? `
           <div class="rt-hotspots">
             <p class="rt-hot-title">📊 逐題正確率　<small>${coldN ? `${coldN} 題全班卡關（紅），建議課堂講評` : '全班表現平穩'}</small></p>
-            <div class="rt-hot-grid">${hot.map((x) => `<span class="rt-hot-cell ${x.cold ? 'cold' : x.pct >= 80 ? 'hot-good' : ''}" title="第${x.qNo}題　${x.correct}/${x.answered} 人答對">${x.qNo}<b>${x.pct == null ? '—' : x.pct + '%'}</b></span>`).join('')}</div>
+            <div class="rt-hot-grid">${hot.map((x) => { const q = questions[x.qNo - 1]; return `<span class="rt-hot-cell ${x.cold ? 'cold' : x.pct >= 80 ? 'hot-good' : ''}" title="第${x.qNo}題　${x.correct}/${x.answered} 人答對">${x.qNo}<b>${x.pct == null ? '—' : x.pct + '%'}</b>${x.cold && q ? `<small>${esc(q.stem)}｜正解：${esc(q.options[q.answerIdx])}</small>` : ''}</span>`; }).join('')}</div>
           </div>` : '';
         const el = root.querySelector('#rt-h-herald');
+        try { localStorage.setItem(`wy_rt_lastheat:${h.code}`, JSON.stringify({ ts: Date.now(), hot, questions: questions.map((q) => ({ stem: q.stem, answer: q.options[q.answerIdx], textId: q.textId })) })); } catch { /* 略過 */ }
         if (el) el.innerHTML = `
           <div class="rt-herald">${herald.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
           <div class="rt-board">${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}</div>
@@ -756,13 +776,14 @@ const WYRt = (() => {
   }
 
   // ---------- 科舉賽季榜 ----------
-  async function seasonScreen() {
+  async function seasonScreen(boardScope = 'class') {
     clearTimers();
     const local = SEASON().loadSeason(SEASON().today());
-    const title = SEASON().titleFor(local.pts);
+    const title = SEASON().titleFor(local.pts, local.correct);
     shell(`${backBar()}<div class="card rt-loading">載入賽季榜…</div>`);
     bindBack();
-    const r = await api('/api/rt-room', { op: 'seasonTop' });
+    const classCode = boardScope === 'class' ? (WYStore.getClassCode() || '') : '';
+    const r = await api('/api/rt-room', { op: 'seasonTop', classCode });
     const top = (r && r.ok) ? r.top : [];
     const list = top.length
       ? top.map((x, i) => `<div class="rt-board-row"><span>${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</span><b>${esc(x.nick)}</b><span>${x.pts} 分</span></div>`).join('')
@@ -771,13 +792,16 @@ const WYRt = (() => {
       ${backBar()}
       <div class="card">
         <h3>🏆 科舉賽季榜　<small>${esc(r && r.ok ? r.season : local.key)}</small></h3>
+        <div class="rt-result-btns"><button class="rt-btn ${boardScope === 'class' ? 'rt-btn--main' : ''}" id="seasonClass">本班榜</button><button class="rt-btn ${boardScope === 'global' ? 'rt-btn--main' : ''}" id="seasonGlobal">全站榜</button></div>
         <div class="rt-title-badge">你本季：${title}（${local.pts} 分・${local.wins} 勝 / ${local.battles} 場）</div>
         <div class="rt-board">${list}</div>
-        <p class="rt-sub">功名六階：童生 → 秀才 → 舉人 → 貢士 → 進士 → 狀元。每月 1 日換季，稱號重新起算；敗場不倒扣。</p>
+        <p class="rt-sub">功名分綁真實答對；勝場另加少量分。敗場只留參與徽章，高階稱號另有賽季累計答對門檻。</p>
         ${!r ? '<div class="rt-err">（連不上伺服器，僅顯示本機分數）</div>' : ''}
       </div>
     `);
     bindBack();
+    root.querySelector('#seasonClass').onclick = () => seasonScreen('class');
+    root.querySelector('#seasonGlobal').onclick = () => seasonScreen('global');
   }
 
   // ---------- 共用：降級 / 錯誤 ----------

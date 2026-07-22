@@ -26,7 +26,7 @@ function weekKey(d = new Date()) {
 const stripBad = (x) => String(x ?? '').replace(/[<>&"']/g, '');
 const BAD_WORDS = /笨蛋|白癡|白痴|智障|廢物|去死|三小|幹你|靠北|媽的|垃圾|腦殘|fuck|shit|bitch|asshole|idiot|stupid|retard/i;
 const okNick = (n) => typeof n === 'string' && n.trim().length >= 1 && n.trim().length <= 12 && !BAD_WORDS.test(n);
-const okCode = (c) => typeof c === 'string' && c.trim().length >= 1 && c.trim().length <= 20;
+const okCode = (c) => typeof c === 'string' && /^[A-Z0-9]{4,8}$/.test(c.trim().toUpperCase());
 const okPin = (p) => typeof p === 'string' && /^\d{4,8}$/.test(p);
 
 const OK_MODE = new Set(['single', 'level', 'mixed']);
@@ -58,6 +58,11 @@ const CORS = (request) => {
 const reply = (request, obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: CORS(request) });
 const parse = (raw) => (raw == null ? null : (typeof raw === 'string' ? JSON.parse(raw) : raw));
 
+async function rateLimited(kv, request, scope, cap = 30) {
+  const ip = String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
+  return (await kv.incr(`wy_rt:live:rl:${scope}:${ip}`, 60)) > cap;
+}
+
 export async function onRequestOptions({ request }) {
   return new Response(null, { status: 204, headers: CORS(request) });
 }
@@ -66,19 +71,32 @@ export async function onRequestPost({ request, env }) {
   const kv = kvFor(env.wenyan_db);
   const body = await request.json().catch(() => ({}));
   const { op } = body || {};
-  const code = String(body.code || '').trim();
+  const code = String(body.code || '').trim().toUpperCase();
   try {
+    if (['start', 'key', 'next', 'end', 'answer', 'goal'].includes(op) && await rateLimited(kv, request, op === 'answer' ? 'answer' : op === 'goal' ? 'goal' : 'write', op === 'answer' ? 90 : op === 'goal' ? 20 : 30)) {
+      return reply(request, { ok: 0, error: '操作太頻繁，請稍候再試' }, 429);
+    }
     if (op === 'start') {
       const { pin, qn } = body;
       const scope = cleanScope(body.scope);
       if (!okCode(code) || !okPin(pin) || !scope) return reply(request, { ok: 0, error: '開場資料不完整（班級碼、4-8 位數主持碼、題數）' }, 400);
       const existing = parse(await kv.get(liveKey(code)));
       if (existing && existing.phase !== 'end') return reply(request, { ok: 0, error: '這個班級碼已有進行中的文會' });
-      const live = { seed: Math.floor(Math.random() * 1e9), qn: clamp(qn, 30) || 10, scope, phase: 'lobby', qNo: 0, pin };
+      const live = { seed: Math.floor(Math.random() * 1e9), qn: clamp(qn, 30) || 10, scope, phase: 'lobby', qNo: 0, pin, answerKey: [] };
       await kv.set(liveKey(code), JSON.stringify(live), { ex: TTL });
       await kv.del(rosterKey(code));
       const { pin: _p, ...pub } = live;
       return reply(request, { ok: 1, live: pub });
+    }
+
+    if (op === 'key') {
+      const live = parse(await kv.get(liveKey(code)));
+      if (!live || body.pin !== live.pin) return reply(request, { ok: 0, error: '主持碼不對' });
+      const key = Array.isArray(body.answerKey) ? body.answerKey.slice(0, live.qn).map((x) => clamp(x, 3)) : [];
+      if (key.length !== live.qn) return reply(request, { ok: 0, error: '答案鍵長度不符' }, 400);
+      live.answerKey = key;
+      await kv.set(liveKey(code), JSON.stringify(live), { ex: TTL });
+      return reply(request, { ok: 1 });
     }
 
     if (op === 'state') {
@@ -107,11 +125,17 @@ export async function onRequestPost({ request, env }) {
     }
 
     if (op === 'answer') {
-      const { nick, qNo, correct } = body;
+      const { nick, qNo, answerIdx, deviceTag } = body;
       if (!okCode(code) || !okNick(nick)) return reply(request, { ok: 0, error: 'bad req' }, 400);
-      const nk = stripBad(nick).trim().slice(0, 12);
+      const live = parse(await kv.get(liveKey(code)));
+      if (!live || !Array.isArray(live.answerKey) || live.answerKey.length < live.qn) return reply(request, { ok: 0, error: '本場答案鍵尚未就緒' }, 409);
+      const tag = String(deviceTag || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 8);
+      if (tag.length < 4) return reply(request, { ok: 0, error: '裝置識別不完整' }, 400);
+      const display = stripBad(nick).trim().slice(0, 12);
+      const nk = `${display}·${tag}`;
       const qn = clamp(qNo, 40);
-      const cur = parse(await kv.hget(rosterKey(code), nk)) || { score: 0, qNo: 0, hist: '' };
+      const correct = clamp(answerIdx, 3) === live.answerKey[qn - 1];
+      const cur = parse(await kv.hget(rosterKey(code), nk)) || { nick: display, score: 0, qNo: 0, hist: '' };
       if (qn <= cur.qNo) return reply(request, { ok: 1 }); // 防重送灌分：同題或舊題忽略
       cur.qNo = qn;
       cur.score += correct ? 1 : 0;
@@ -128,21 +152,25 @@ export async function onRequestPost({ request, env }) {
       if (!okCode(code)) return reply(request, { ok: 0, error: 'bad req' }, 400);
       const wk = weekKey();
       const gk = `wy_rt:goal:${code}:${wk}`;
+      const rosterN = await kv.hlen(rosterKey(code));
+      const target = Math.max(100, rosterN * 20);
+      const weeksKey = `wy_rt:goal:${code}:weeks`;
       if (op === 'goalState') {
         const v = await kv.get(gk);
-        return reply(request, { ok: 1, count: Number(v) || 0, weekKey: wk });
+        return reply(request, { ok: 1, count: Number(v) || 0, target, achievedWeeks: Number(await kv.get(weeksKey)) || 0, weekKey: wk });
       }
-      const add = clamp(body.n, 20) || 1; // 單次上報上限 20，防一次灌大量
-      let count = 0;
-      for (let i = 0; i < add; i++) count = await kv.incr(gk, 8 * 86400); // 週計數存 8 天
-      return reply(request, { ok: 1, count, weekKey: wk });
+      const add = clamp(body.n, 5) || 1;
+      const count = await kv.incrby(gk, add, 8 * 86400);
+      const mark = `${gk}:achieved`;
+      if (count >= target && !(await kv.exists(mark))) { await kv.set(mark, '1', { ex: 8 * 86400 }); await kv.incr(weeksKey); }
+      return reply(request, { ok: 1, count, target, achievedWeeks: Number(await kv.get(weeksKey)) || 0, weekKey: wk });
     }
 
     if (op === 'roster') {
       if (!okCode(code)) return reply(request, { ok: 0, error: 'bad req' }, 400);
       const all = await kv.hgetall(rosterKey(code));
       const list = all
-        ? Object.entries(all).map(([nick, v]) => { const o = parse(v); return { nick, score: o.score, qNo: o.qNo, hist: o.hist }; })
+        ? Object.entries(all).map(([, v]) => { const o = parse(v); return { nick: o.nick, score: o.score, qNo: o.qNo, hist: o.hist }; })
         : [];
       list.sort((a, b) => b.score - a.score || a.qNo - b.qNo);
       return reply(request, { ok: 1, list });

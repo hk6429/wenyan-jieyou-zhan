@@ -10,7 +10,7 @@ const WYMarket = (() => {
   function init() { /* 目前不需 TEXTS；保留簽名供主線程 boot 呼叫 */ }
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const imgTag = (src, alt, cls) => `<img src="${esc(src)}" alt="${esc(alt)}" class="${cls}" onerror="this.classList.add('img-fallback');this.removeAttribute('src');" />`;
+  const imgTag = (src, alt, cls) => `<img src="${esc(String(src || '').replace(/\.png$/i, '-thumb.webp'))}" alt="${esc(alt)}" class="${cls}" onerror="this.classList.add('img-fallback');this.removeAttribute('src');" />`;
   const now = () => Date.now();
   const toast = (msg) => { const el = document.getElementById('mkt-status'); if (el) { el.textContent = msg; el.classList.add('mkt-flash'); setTimeout(() => el.classList.remove('mkt-flash'), 800); } };
 
@@ -147,9 +147,9 @@ const WYMarket = (() => {
   }
 
   async function doBuy(id, price, gearId, cc, nick, cardId) {
-    const res = await callMarket({ op: 'buy', id, nick, classCode: cc, cardId });
-    if (!res || res.ok !== 1) { toast((res && res.error) || '購買失敗'); if (res && res.error) draw(); return; }
     if (!WYStore.spendInk(price)) { toast('墨錠不足'); return; }
+    const res = await callMarket({ op: 'buy', id, nick, classCode: cc, cardId });
+    if (!res || res.ok !== 1) { WYStore.addInk(price); toast((res && res.error) || '購買失敗，墨錠已退回'); if (res && res.error) draw(); return; }
     S().addOwned(res.gearId);
     S().bumpBuys(now());
     S().recordEverOwned({ gearId: res.gearId, dir: 'bought', peer: '', ts: now() });
@@ -161,6 +161,7 @@ const WYMarket = (() => {
   function drawGear(body) {
     const owned = S().sellableGear();
     const mods = S().activeGearMods();
+    const dup = new Set(S().duplicateIds());
     if (!owned.length) { body.innerHTML = '<div class="card mkt-empty">還沒有文房道具。對戰勝利與篇目精通有機會掉落，或到集市購入。</div>'; return; }
     body.innerHTML = `
       <div class="card mkt-gear-summary">裝備加成：對戰傷害 +${mods.damageBonus}　墨錠掉落 +${Math.round(mods.inkDropBonus * 100)}%
@@ -172,12 +173,17 @@ const WYMarket = (() => {
             <div class="mkt-card-info"><strong class="mkt-card-name">${esc(g.name)}</strong>
               <div class="mkt-card-sub"><span class="mkt-tier mkt-tier-g${g.grade}">${g.tierLabel}</span>　${esc(g.catLabel)}</div></div>
             <button class="mkt-equip-btn ${eq ? 'on' : ''}" data-eq="${esc(g.id)}">${eq ? '✓ 已裝備' : '裝備'}</button>
+            ${dup.has(g.id) ? `<button class="mkt-mini-btn" data-melt="${esc(g.id)}">熔煉重複件・回收 5 墨</button>` : ''}
           </div></div>`;
       }).join('')}</div>`;
     body.querySelectorAll('[data-eq]').forEach((b) => { b.onclick = () => {
       const r = S().toggleEquip(b.dataset.eq);
       if (!r.ok && r.reason === 'full') return toast(`最多裝備 ${S().EQUIP_MAX} 件`);
       drawGear(body);
+    }; });
+    body.querySelectorAll('[data-melt]').forEach((b) => { b.onclick = () => {
+      if (!S().removeOwned(b.dataset.melt).ok) return;
+      WYStore.earnInk(5); toast('重複文房已熔煉，回收墨錠受每日上限約束。'); drawGear(body);
     }; });
   }
 
@@ -306,10 +312,10 @@ const WYMarket = (() => {
   // —— 硯靈行商（NPC 直購，不需班級碼、每日皆可）——
   function drawYanling(body) {
     const stock = S().yanlingStock();
-    const price = S().YANLING_PRICE;
     body.innerHTML = `
       <div class="card mkt-yanling-head">
-        <p class="mkt-sub">🖋️ 硯靈平日擺攤，只賣「凡品」四寶，每件 <strong>${price}</strong> 墨錠，隨買隨得。想要良品／珍品，週末找同窗交易。</p>
+        <p class="mkt-sub">🖋️ 硯靈平日擺攤：凡品、良品與純外觀都有，隨買隨得；不販售精通捷徑。</p>
+        <div class="mkt-card-main"><button class="primary" id="buyHint">30 墨・提示券（現有 ${WYStore.getHintTickets()}）</button><button class="primary" id="buyDecor">45 墨・限定草堂外觀</button></div>
       </div>
       <div class="mkt-list">
         ${stock.map((g) => `
@@ -317,9 +323,9 @@ const WYMarket = (() => {
             <div class="mkt-card-main">${imgTag(g.img, g.name, 'mkt-card-img')}
               <div class="mkt-card-info">
                 <strong class="mkt-card-name">${esc(g.name)}</strong>
-                <div class="mkt-card-sub">${esc(g.catLabel)}・凡品　${esc(g.desc)}</div>
+                <div class="mkt-card-sub">${esc(g.catLabel)}・${esc(g.tierLabel)}　${esc(g.desc)}</div>
               </div>
-              <button class="primary mkt-buy-btn" data-yl="${esc(g.id)}">${price} 墨・購入</button>
+              <button class="primary mkt-buy-btn" data-yl="${esc(g.id)}" data-price="${g.price}">${g.price} 墨・購入</button>
             </div>
           </div>`).join('')}
       </div>`;
@@ -327,6 +333,7 @@ const WYMarket = (() => {
       b.onclick = () => {
         const id = b.dataset.yl;
         if (!S().GEAR_BY_ID[id]) return toast('查無此物');
+        const price = Number(b.dataset.price);
         if (!WYStore.spendInk(price)) return toast('墨錠不足');
         S().addOwned(id);
         S().recordEverOwned({ gearId: id, dir: 'buy', peer: '硯靈行商' });
@@ -334,6 +341,8 @@ const WYMarket = (() => {
         draw();
       };
     });
+    document.getElementById('buyHint').onclick = () => { if (!WYStore.buyHintTicket()) return toast('墨錠不足'); toast('提示券已入袋；答錯時可排除一個誘答。'); draw(); };
+    document.getElementById('buyDecor').onclick = () => { if (!WYStore.buyCaotangDecor()) return toast('墨錠不足'); toast('草堂限定外觀已收藏！'); draw(); };
   }
 
   // —— 設定班級與道號 ——

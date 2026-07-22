@@ -26,6 +26,7 @@
 }
 
 * { box-sizing: border-box; }
+.sr-only{ position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -381,7 +382,7 @@ button.primary:active { transform: scale(.97); }
 .wenhao-no {
   position: absolute;
   top: 6px; left: 8px;
-  font-size: .68rem;
+  font-size: .75rem;
   color: var(--ink-dan);
   letter-spacing: .05em;
 }
@@ -610,12 +611,12 @@ button.primary:active { transform: scale(.97); }
   cursor: pointer;
 }
 .guide-reopen:hover { color: var(--zhu); border-color: var(--zhu); }
-.ink-today { display: block; font-family: var(--font-ui); font-size: .62rem; font-weight: 500; color: var(--ink-dan); letter-spacing: .02em; margin-top: 1px; }
+.ink-today { display: block; font-family: var(--font-ui); font-size: .75rem; font-weight: 500; color: var(--ink-dan); letter-spacing: .02em; margin-top: 1px; }
 .ink-today-full { color: var(--zhu); }
 
 /* 次級導覽（江湖：草堂/擂台/合契/市集），視覺弱化以突顯主線 */
 nav.tabs.tabs-sub { padding-top: 2px; padding-bottom: 2px; align-items: center; }
-nav.tabs.tabs-sub button { flex: 1; font-size: .82rem; padding: 7px 6px 8px; color: var(--ink-dan); }
+nav.tabs.tabs-sub button { flex: 1; font-size: .82rem; padding: 7px 6px 8px; min-height:44px; color: var(--ink-dan); }
 nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .tabs-sub-label {
   flex: 0 0 auto; font-family: var(--font-brush); font-size: .8rem;
@@ -710,7 +711,7 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .mood-picker{ padding:13px 15px; }
 .mood-title{ font-size:.9rem; color:var(--ink-zhong); margin:0 0 8px; font-family:var(--font-brush); }
 .mood-chips{ display:flex; flex-wrap:wrap; gap:6px; }
-.mood-chip{ padding:.35em .85em; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-zhong); font-size:.85rem; cursor:pointer; transition:background .15s; }
+.mood-chip{ padding:.35em .85em; min-height:44px; display:inline-flex; align-items:center; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-zhong); font-size:.85rem; cursor:pointer; transition:background .15s; }
 .mood-chip:hover{ background:var(--paper-aged); }
 .mood-chip.active{ background:var(--yan); color:#fff; border-color:var(--yan); }
 .mood-hint{ margin:8px 0 0; font-size:.82rem; color:var(--ink-dan); }
@@ -731,7 +732,7 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .dash-backup-note{ font-size:.82rem; color:var(--ink-dan); }
 .dash-backup-btns{ display:flex; gap:8px; flex-wrap:wrap; }
 .dash-backup-btns button{ font-size:.82rem; padding:.45em .9em; }
-.dash-backup-box{ width:100%; min-height:64px; margin-top:8px; font-size:.72rem; border:1px solid var(--line); border-radius:8px; padding:6px; box-sizing:border-box; }
+.dash-backup-box{ width:100%; min-height:64px; margin-top:8px; font-size:.75rem; border:1px solid var(--line); border-radius:8px; padding:6px; box-sizing:border-box; }
 
 /* 此篇之憂 */
 .worry-card{ background:linear-gradient(180deg,var(--paper-warm),var(--paper)); border-left:4px solid var(--yan); }
@@ -740,7 +741,8 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .worry-echo{ color:var(--ink-dan); font-size:.9rem; margin:0; }
 
 /* ① 短回合結算卡 */
-.settle-card{ text-align:center; padding:22px 18px; }
+@keyframes settle-in{ from{ transform:translateY(14px) scale(.96); opacity:0 } to{ transform:none; opacity:1 } }
+.settle-card{ text-align:center; padding:22px 18px; animation:settle-in .35s ease-out; }
 .settle-card h3{ margin:.1em 0 .5em; font-family:var(--font-brush); }
 .settle-stats{ display:flex; justify-content:center; gap:22px; margin:.3em 0; }
 .settle-stat{ display:flex; flex-direction:column; }
@@ -756,13 +758,13 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .self-explain{ margin-top:10px; padding:12px; border:1px dashed var(--ink-qing); border-radius:12px; background:var(--paper-warm); }
 .self-explain .se-q{ font-size:.9rem; color:var(--ink-zhong); margin:0 0 8px; }
 .se-opts{ display:flex; flex-wrap:wrap; gap:6px; }
-.se-btn{ padding:.5em .9em; border:1px solid var(--ink-qing); border-radius:10px; background:var(--paper); color:var(--ink-nong); cursor:pointer; font-size:.86rem; transition:transform .08s,background .15s; }
+.se-btn{ padding:.5em .9em; min-height:44px; border:1px solid var(--ink-qing); border-radius:10px; background:var(--paper); color:var(--ink-nong); cursor:pointer; font-size:.86rem; transition:transform .08s,background .15s; }
 .se-btn:hover{ background:var(--paper-aged); transform:translateY(-1px); }
 
 /* ⑧ 能力標籤專練 */
 .quiz-tag-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
 .quiz-tag-label{ font-size:.8rem; color:var(--ink-dan); }
-.quiz-tag-btn{ padding:.3em .7em; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-dan); font-size:.8rem; cursor:pointer; }
+.quiz-tag-btn{ padding:.3em .7em; min-height:44px; display:inline-flex; align-items:center; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-dan); font-size:.8rem; cursor:pointer; }
 .quiz-tag-btn.active{ background:var(--dai); color:#fff; border-color:var(--dai); }
 
 /* ⑤ 連對慶祝分級（combo-banner 基底已存在，這裡加分級樣式） */
@@ -774,6 +776,16 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 /* 答對放大微反應 */
 @keyframes pop-in{ 0%{ transform:scale(.94); } 50%{ transform:scale(1.05); } 100%{ transform:scale(1); } }
 .options button.pop{ animation:pop-in .22s ease-out; }
+.quiz-question-card{ position:relative; animation:settle-in .16s ease-out; }
+.yanling-companion{ position:absolute; right:10px; top:8px; display:flex; flex-direction:column; align-items:center; font-size:1.25rem; }
+.yanling-companion small{ font-size:.7rem; color:var(--ink-dan); }
+.yanling-companion.cheer{ animation:pop-in .45s ease-out; }
+.combo-chip{ position:absolute; right:12px; top:52px; z-index:4; padding:3px 9px; border-radius:999px; background:var(--paper-aged); color:var(--zhu); font-size:.78rem; animation:pop-in .4s ease-out; }
+.class-join-card input{ min-width:90px; max-width:130px; padding:8px; }
+.settle-mood,.settle-companion{ color:var(--ink-dan); font-size:.86rem; }
+.mastery-reveal .drop-inner{ max-width:min(88vw,520px); pointer-events:none; }
+.opponent-card small{ display:block; font-size:.72rem; margin-top:3px; }
+.battle-source{ margin:10px 0; font-size:.86rem; }
 /* 對戰低血量脈動 */
 @keyframes hp-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
 .hp-fill.low{ background:var(--zhu); animation:hp-pulse .9s ease-in-out infinite; }

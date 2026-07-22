@@ -103,14 +103,21 @@ test('戰帖：壞碼/過期碼回 ok:0，不炸 500', async () => {
   assert.equal((await call(e, { op: 'accept', code: 'AAAAAA' })).ok, 0);
 });
 
-test('賽季：seasonAdd 累積、封頂單場 20、seasonTop 前 10 降冪', async () => {
+test('賽季：只接受一次性已結算憑證，積分綁答對，並支援班級榜', async () => {
   const e = env();
-  await call(e, { op: 'seasonAdd', nick: '甲', pts: 20 });
-  const r = await call(e, { op: 'seasonAdd', nick: '甲', pts: 999 }); // clamp 20
-  assert.equal(r.total, 40);
-  await call(e, { op: 'seasonAdd', nick: '乙', pts: 5 });
-  const top = await call(e, { op: 'seasonTop' });
+  const makeToken = async (nick, correct, win = true) => {
+    const c = await call(e, { op: 'challenge', seed: 1, scope: { mode: 'mixed' }, nick: '對手', score: win ? 10 : 30 });
+    const r = await call(e, { op: 'challengeResult', code: c.code, nick, score: 20, correct, classCode: '5A03' });
+    return r.seasonToken;
+  };
+  const t1 = await makeToken('甲', 8);
+  const r1 = await call(e, { op: 'seasonAdd', seasonToken: t1 });
+  assert.equal(r1.total, 10);
+  assert.equal((await call(e, { op: 'seasonAdd', seasonToken: t1 })).ok, 0); // 不可重放
+  await call(e, { op: 'seasonAdd', seasonToken: await makeToken('甲', 10) });
+  await call(e, { op: 'seasonAdd', seasonToken: await makeToken('乙', 5, false) });
+  const top = await call(e, { op: 'seasonTop', classCode: '5A03' });
   assert.equal(top.ok, 1);
   assert.match(top.season, /^\d{4}-\d{2}$/);
-  assert.deepEqual(top.top, [{ nick: '甲', pts: 40 }, { nick: '乙', pts: 5 }]);
+  assert.deepEqual(top.top, [{ nick: '甲', pts: 22 }, { nick: '乙', pts: 0 }]);
 });

@@ -24,7 +24,7 @@ const WYFusion = (() => {
   }
 
   const imgTag = (src, alt, cls) =>
-    `<img src="${esc(src)}" alt="${esc(alt)}" class="${cls}" onerror="this.classList.add('img-fallback');this.removeAttribute('src');" />`;
+    `<img src="${esc(String(src || '').replace(/\.png$/i, '.webp'))}" alt="${esc(alt)}" class="${cls}" onerror="this.classList.add('img-fallback');this.removeAttribute('src');" />`;
 
   function render(mountEl) {
     mount = mountEl;

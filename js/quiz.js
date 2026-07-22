@@ -35,7 +35,7 @@ const WYQuiz = (() => {
   //   type：篩單一題型（char/sentence/gist/theme）；null＝混合。
   //   tag ：篩能力標籤（虛詞/活用/古今異義/通假/句式）——供「專練某能力」，不生成新題只篩既有題。
   //   n   ：短關題數上限（null＝全部；自測短關傳 8，對戰不傳＝整池循環）。
-  //   ramp：true 時把本輪依題型難度由易到難排序（保證第一題最好上手），供混合短關暖身。
+  //   ramp：true 時只把一題最易題放在開頭，其餘維持交錯順序。
   function buildQuiz(textId, { type = null, tag = null, seed = Date.now(), n = null, ramp = false } = {}) {
     const t = texts.find((x) => x.id === textId);
     if (!t) return { title: '', questions: [] };
@@ -44,7 +44,12 @@ const WYQuiz = (() => {
     if (tag) pool = pool.filter((q) => Array.isArray(q.tags) && q.tags.includes(tag));
     let qs = seededShuffle(pool, seed);
     if (n && n > 0) qs = qs.slice(0, n);
-    if (ramp) qs.sort((a, b) => (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9));
+    if (ramp && qs.length > 1) {
+      let easiest = 0;
+      for (let i = 1; i < qs.length; i++) if ((TYPE_ORDER[qs[i].type] ?? 9) < (TYPE_ORDER[qs[easiest].type] ?? 9)) easiest = i;
+      const [warmup] = qs.splice(easiest, 1);
+      qs.unshift(warmup);
+    }
     qs = qs.map((q) => {
       const optOrder = seededShuffle([0, 1, 2, 3], optSeed(q.id, seed));
       return {
@@ -110,10 +115,22 @@ const WYQuiz = (() => {
 
   // 依一組 qId（可跨篇、含 cloze）重建一份複習卷：SRS 今日到期、錯題本共用。
   // 每題自帶 textId（跨篇混合，作答計分時用各自的 textId）。找不到的 id 略過。
-  function buildReviewQuiz(qIds, { seed = Date.now(), title = '複習' } = {}) {
+  function buildReviewQuiz(qIds, { seed = Date.now(), title = '複習', n = 10 } = {}) {
     const wantCloze = new Map(); // textId -> Set(word|segNo) 供批次重建
     const out = [];
     (qIds || []).forEach((qId, i) => {
+      const fm = /^fc-(t\d{2})-(\d+)$/.exec(qId);
+      if (fm) {
+        const t = texts.find((x) => x.id === fm[1]);
+        const seg = t && (t.segments || []).find((x) => Number(x.no) === Number(fm[2]));
+        if (t && seg && seg.translation) {
+          const distractors = texts.flatMap((x) => x.segments || []).map((x) => x.translation).filter((x) => x && x !== seg.translation);
+          const options = [seg.translation, ...seededShuffle(distractors, optSeed(qId, seed)).slice(0, 3)];
+          const order = seededShuffle([0, 1, 2, 3], optSeed(qId, seed + i));
+          out.push({ id: qId, textId: t.id, stem: `下列何者最接近「${seg.text}」的白話語譯？`, options: order.map((k) => options[k]), answerIdx: order.indexOf(0), explain: `原句「${seg.text}」可譯為：${seg.translation}`, type: 'sentence', tags: [] });
+        }
+        return;
+      }
       const m = /^cloze-(t\d{2})-(\d+)-(.+)$/.exec(qId);
       if (m) {
         const [, tId] = m;
@@ -141,7 +158,7 @@ const WYQuiz = (() => {
       const full = buildClozeQuiz(tId, { seed, n: 999 });
       full.questions.forEach((q) => { if (ids.has(q.id)) out.push({ ...q, textId: tId }); });
     }
-    return { title, textId: null, questions: seededShuffle(out, seed), mode: 'review' };
+    return { title, textId: null, questions: seededShuffle(out.slice(0, n), seed), mode: 'review' };
   }
 
   // 填空作答判對（寬鬆比對：全半形、空白差異都容忍）

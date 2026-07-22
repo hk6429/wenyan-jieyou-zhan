@@ -70,7 +70,7 @@ const WYBattle = (() => {
   const FREE_UNLOCK = 2;
   function unlockedRoster() {
     const mastered = new Set(WYStore.allMastered());
-    return ROSTER.map((r, i) => ({ ...r, unlocked: i < FREE_UNLOCK || mastered.has(r.unlockText) }));
+    return ROSTER.map((r, i) => ({ ...r, unlocked: i < FREE_UNLOCK || r.unlockText === 't06' || mastered.has(r.unlockText) }));
   }
 
   return { ROSTER, newBattle, resolveAnswer, unlockedRoster };

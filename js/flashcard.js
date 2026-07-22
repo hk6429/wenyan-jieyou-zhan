@@ -29,7 +29,7 @@ const WYFlashcard = (() => {
   }
 
   function next() {
-    idx = Math.min(idx + 1, queue.length - 1);
+    idx = Math.min(idx + 1, queue.length);
     return current();
   }
 
@@ -39,7 +39,7 @@ const WYFlashcard = (() => {
   }
 
   function progress() {
-    return { idx: idx + 1, total: queue.length };
+    return { idx: Math.min(idx + 1, queue.length), total: queue.length, finished: queue.length > 0 && idx >= queue.length };
   }
 
   return { init, buildQueue, current, next, prev, progress };

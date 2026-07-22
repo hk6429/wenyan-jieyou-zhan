@@ -98,7 +98,7 @@
   function isMastered(stat) {
     if (!stat || stat.total < 10 || !(stat.correct / stat.total >= 0.8)) return false;
     const types = stat.types || {};
-    return CT_QUIZ_TYPES.every((ty) => (types[ty] && types[ty].total >= 2));
+    return CT_QUIZ_TYPES.every((ty) => (types[ty] && types[ty].correct >= 2));
   }
 
   function totalCorrect(progress) {
@@ -161,7 +161,9 @@
   function gateStage(texts, progress) {
     const mastered = masteredTexts(texts, progress).length;
     const ratio = mastered / TOTAL_TEXTS;
-    const stage = Math.max(0, Math.min(GATE_STAGES.length - 1, Math.floor(ratio * GATE_STAGES.length)));
+    const stage = mastered === TOTAL_TEXTS
+      ? GATE_STAGES.length - 1
+      : Math.max(0, Math.min(GATE_STAGES.length - 2, Math.floor(ratio * GATE_STAGES.length)));
     return {
       stage,
       name: GATE_STAGES[stage],

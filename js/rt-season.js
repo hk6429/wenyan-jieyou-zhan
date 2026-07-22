@@ -1,9 +1,9 @@
 // 科舉賽季排位（純邏輯＋本機存檔）：月為週期，積分換功名稱號，月初自動換季歸零。
-// 敗不倒扣（白帽）。本機 localStorage key = wy_rt_season。可 node --test（注入假 localStorage）。
+// 功名分只綁真實答對；敗場只留參與紀錄、不加功名分。
 const WYRtSeason = (() => {
   const LS_KEY = 'wy_rt_season';
-  const WIN_PTS = 20;
-  const LOSE_PTS = 5; // 輸／平也加分，白帽不倒扣
+  const WIN_PTS = 2;  // 勝場少量加成；主要分數仍來自該場答對題數
+  const LOSE_PTS = 0;
 
   // 功名六階：童生 → 秀才 → 舉人 → 貢士 → 進士 → 狀元
   const TITLES = [
@@ -16,9 +16,13 @@ const WYRtSeason = (() => {
   ];
 
   const seasonKey = (dateStr) => String(dateStr).slice(0, 7); // 'YYYY-MM-DD' → 'YYYY-MM'
-  function titleFor(pts) {
+  const CORRECT_GATES = { 貢士: 80, 進士: 160, 狀元: 240 };
+  function titleFor(pts, correct = Infinity) {
     let t = TITLES[0].title;
-    for (const x of TITLES) if (pts >= x.min) t = x.title;
+    for (const x of TITLES) {
+      const gate = CORRECT_GATES[x.title] || 0;
+      if (pts >= x.min && correct >= gate) t = x.title;
+    }
     return t;
   }
 
@@ -28,12 +32,12 @@ const WYRtSeason = (() => {
 
   function loadSeason(dateStr = today()) {
     const key = seasonKey(dateStr);
-    let cur = { key, pts: 0, wins: 0, battles: 0 };
+    let cur = { key, pts: 0, wins: 0, battles: 0, correct: 0, participation: 0 };
     try {
       const raw = globalThis.localStorage && globalThis.localStorage.getItem(LS_KEY);
       if (raw) {
         const o = JSON.parse(raw);
-        if (o && o.key === key) cur = { key, pts: o.pts || 0, wins: o.wins || 0, battles: o.battles || 0 };
+        if (o && o.key === key) cur = { key, pts: o.pts || 0, wins: o.wins || 0, battles: o.battles || 0, correct: o.correct || 0, participation: o.participation || 0 };
       }
     } catch { /* 隱私模式讀取失敗：回全新賽季 */ }
     return cur;
@@ -46,15 +50,18 @@ const WYRtSeason = (() => {
   }
 
   // verdict: 'win' | 'lose' | 'draw'
-  function recordResult(dateStr, verdict) {
+  function recordResult(dateStr, verdict, correct = 0) {
     const s = loadSeason(dateStr);
-    s.pts += verdict === 'win' ? WIN_PTS : LOSE_PTS;
+    const verifiedCorrect = Math.max(0, Math.min(30, Math.round(Number(correct) || 0)));
+    s.correct += verifiedCorrect;
+    s.pts += verdict === 'win' ? verifiedCorrect + WIN_PTS : 0;
     if (verdict === 'win') s.wins += 1;
+    else s.participation += 1;
     s.battles += 1;
     save(s);
-    return { ...s, title: titleFor(s.pts) };
+    return { ...s, title: titleFor(s.pts, s.correct) };
   }
 
-  return { LS_KEY, WIN_PTS, LOSE_PTS, TITLES, seasonKey, titleFor, today, loadSeason, recordResult };
+  return { LS_KEY, WIN_PTS, LOSE_PTS, TITLES, CORRECT_GATES, seasonKey, titleFor, today, loadSeason, recordResult };
 })();
 if (typeof globalThis !== 'undefined') globalThis.WYRtSeason = WYRtSeason;

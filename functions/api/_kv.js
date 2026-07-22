@@ -27,6 +27,14 @@ export function kvFor(db) {
       const v = await db.prepare('SELECT v FROM kv WHERE k=?1').bind(k).first('v');
       return Number(v);
     },
+    async incrby(k, delta, ttlSec) {
+      const add = Math.max(0, Math.round(Number(delta) || 0));
+      await db.prepare('DELETE FROM kv WHERE k=?1 AND exp IS NOT NULL AND exp<=?2').bind(k, now()).run();
+      const exp = ttlSec ? now() + ttlSec * 1000 : null;
+      await db.prepare("INSERT INTO kv (k,v,exp) VALUES (?1,?2,?3) ON CONFLICT(k) DO UPDATE SET v=CAST((CAST(v AS INTEGER)+?2) AS TEXT)").bind(k, String(add), exp).run();
+      const v = await db.prepare('SELECT v FROM kv WHERE k=?1').bind(k).first('v');
+      return Number(v);
+    },
     async del(...keys) {
       for (const k of keys) {
         await db.batch([

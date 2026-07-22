@@ -40,14 +40,14 @@
       : '';
     const gate = `
       <button class="ct-gate" type="button" data-stage="${g.stage}" aria-label="山門・${esc(g.name)}，第 ${g.stage + 1} 之 ${g.total} 境">
-        <img class="ct-gate-img" src="${IMG_DIR}/gate-s${g.stage + 1}.png" alt="" loading="lazy" ${fb('⛩️')}>
+        <img class="ct-gate-img" src="${IMG_DIR}/gate-s${g.stage + 1}.webp" alt="" loading="lazy" ${fb('⛩️')}>
         <span class="ct-plaque">${esc(plaqueText)}</span>
         <span class="ct-gate-rank">文氣・${esc(g.name)}（${g.stage + 1}／${g.total} 境）</span>
       </button>`;
 
     const courts = v.courtyards.map((c) => `
       <div class="ct-court ct-court--t${c.tier}" data-id="${c.id}" aria-label="${esc(c.name)}・${esc(c.tierName)}・${c.pct}%">
-        <img class="ct-court-img" src="${IMG_DIR}/court-${c.id}-t${c.tier + 1}.png" alt="" loading="lazy" ${fb('🏯')}>
+        <img class="ct-court-img" src="${IMG_DIR}/court-${c.id}-t${c.tier + 1}.webp" alt="" loading="lazy" ${fb('🏯')}>
         <div class="ct-court-cap">
           <strong>${esc(c.name)}</strong>
           <span class="ct-tier-badge">${esc(c.tierName)}</span>
@@ -59,12 +59,12 @@
     const decors = v.decorations.map((d) => `
       <div class="ct-decor ct-decor--${d.kind}" data-decor="${d.id}" style="left:${d.x}%;top:${d.y}%"
            role="button" tabindex="0" aria-label="${esc(d.name)}（可拖曳擺放）">
-        <img src="${IMG_DIR}/decor-${d.kind}.png" alt="" draggable="false" loading="lazy" ${fb(d.emoji)}>
+        <img src="${IMG_DIR}/decor-${d.kind}.webp" alt="" draggable="false" loading="lazy" ${fb(d.emoji)}>
       </div>`).join('');
 
     return `
       <div class="ct-scene" id="ct-scene">
-        <div class="ct-bg"><img src="${IMG_DIR}/bg-garden.png" alt="" loading="lazy" ${fb('🏞️')}></div>
+        <div class="ct-bg"><img src="${IMG_DIR}/bg-garden.webp" alt="" loading="lazy" ${fb('🏞️')}></div>
         ${couplet}
         <div class="ct-gate-wrap">${gate}</div>
         <div class="ct-courts">${courts}</div>

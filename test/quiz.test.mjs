@@ -58,3 +58,18 @@ test('buildClozeQuiz：未知 textId 回空題組不丟例外', () => {
 test('typeLabel 認得 cloze', () => {
   assert.equal(Q.typeLabel('cloze'), '填空');
 });
+
+test('buildReviewQuiz：fc- 閃卡到期題可重建為語譯選擇題，且每場最多 10 題', () => {
+  const ids = TEXTS[0].segments.map((s) => `fc-${TEXTS[0].id}-${s.no}`);
+  const r = Q.buildReviewQuiz([...ids, ...TEXTS[0].questions.slice(0, 20).map((q) => q.id)], { seed: 9 });
+  assert.ok(r.questions.some((q) => q.id.startsWith('fc-')));
+  assert.ok(r.questions.length <= 10);
+  for (const q of r.questions) assert.equal(q.options.length, 4);
+});
+
+test('混合暖身只把最易題置頂，其餘仍維持交錯而非整批依題型排序', () => {
+  const r = Q.buildQuiz('t01', { seed: 21, n: 20, ramp: true });
+  const order = r.questions.map((q) => ({ char: 0, sentence: 1, gist: 2, theme: 3 }[q.type]));
+  assert.equal(order[0], Math.min(...order));
+  assert.ok(order.slice(1).some((x, i, a) => i > 0 && x < a[i - 1]), `其餘題型應交錯，實得 ${order}`);
+});

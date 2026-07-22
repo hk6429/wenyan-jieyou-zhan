@@ -14,7 +14,7 @@ const WYRenown = (() => {
     { name: '進士', at: 900 },
     { name: '翰林', at: 1200 },
     { name: '大學士', at: 1600 },
-    { name: '文宗', at: 2200 },
+    { name: '文宗', at: 2900 },
   ];
 
   // 文名值：精通篇數×100（主軸）＋累計「答對」數×1（勤學）＋收藏加分（文魄/文房，若有）
@@ -35,9 +35,13 @@ const WYRenown = (() => {
   function rank() {
     const sc = score();
     let cur = RANKS[0], next = null;
+    let masteredCount = 0;
+    try { masteredCount = WYStore.allMastered().length; } catch { /* store 未載入 */ }
     for (let i = 0; i < RANKS.length; i++) {
+      if (RANKS[i].name === '文宗' && masteredCount !== 27) continue;
       if (sc >= RANKS[i].at) { cur = RANKS[i]; next = RANKS[i + 1] || null; }
     }
+    if (cur.name === '大學士' && masteredCount !== 27) next = RANKS[RANKS.length - 1];
     const span = next ? next.at - cur.at : 1;
     const into = next ? sc - cur.at : 1;
     return {

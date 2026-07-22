@@ -69,7 +69,7 @@ const WYMarketStore = (() => {
   // 讓單機玩家平日也有地方花墨錠；珍稀道具仍留給週末同窗交易。金流（扣墨錠）仍由 UI 層走 WYStore，本層不碰。
   const YANLING_PRICE = 60;
   function yanlingStock() {
-    return GEAR.filter((g) => tierOf(g.id) === 'fan').map((g) => ({ id: g.id, name: g.name, cat: g.cat, catLabel: CAT_LABEL[g.cat], img: g.img, desc: g.desc, price: YANLING_PRICE }));
+    return GEAR.filter((g) => tierOf(g.id) !== 'zhen').map((g) => ({ id: g.id, name: g.name, cat: g.cat, catLabel: CAT_LABEL[g.cat], img: g.img, desc: g.desc, price: tierOf(g.id) === 'fan' ? YANLING_PRICE : 180, tierLabel: TIER_LABEL[tierOf(g.id)] }));
   }
 
   // —— 掉落規則（資料結構＋純函式；實際接點在整合筆記說明，主線程於對戰勝利／精通里程碑呼叫）——
@@ -93,6 +93,12 @@ const WYMarketStore = (() => {
     const pool = GEAR_BY_TIER[tier];
     if (!pool || !pool.length) return null;
     return pool[Math.floor(rng() * pool.length)].id;
+  }
+  function rollDropNew({ event = 'mastery', combo = 0, rng = Math.random } = {}) {
+    const owned = new Set(loadGear().owned);
+    const preferred = GEAR.filter((g) => !owned.has(g.id) && tierOf(g.id) !== 'zhen');
+    if (preferred.length) return preferred[Math.floor(rng() * preferred.length)].id;
+    return rollDrop({ event, combo, rng });
   }
 
   // —— 可注入 storage backend（比照 store.js／fusion-store.js 手法）——
@@ -129,6 +135,11 @@ const WYMarketStore = (() => {
     if (!g.owned.includes(gearId)) g.loadout = g.loadout.filter((x) => x !== gearId);
     saveGear(g);
     return { ok: true };
+  }
+  function duplicateIds() {
+    const seen = new Set(), dup = new Set();
+    for (const id of loadGear().owned) { if (seen.has(id)) dup.add(id); seen.add(id); }
+    return [...dup];
   }
   function isEquipped(gearId) { return loadGear().loadout.includes(gearId); }
   const EQUIP_MAX = 4;
@@ -174,8 +185,8 @@ const WYMarketStore = (() => {
 
   return {
     GEAR, GEAR_BY_ID, CAT_LABEL, TIER_OF_PRICE, TIER_LABEL, TIER_GRADE, PRICE_BAND, THANKS_CARDS, DAILY_BUY_CAP, DROP_RULE, EQUIP_MAX, YANLING_PRICE,
-    tierOf, bandOf, isMarketOpen, weekKey, nextOpenText, rollDrop, yanlingStock,
-    setStorageBackend, loadGear, saveGear, ownedGear, sellableGear, addOwned, removeOwned, isEquipped, toggleEquip, gearMods, activeGearMods,
+    tierOf, bandOf, isMarketOpen, weekKey, nextOpenText, rollDrop, rollDropNew, yanlingStock,
+    setStorageBackend, loadGear, saveGear, ownedGear, sellableGear, addOwned, removeOwned, duplicateIds, isEquipped, toggleEquip, gearMods, activeGearMods,
     getClaims, addClaim, removeClaim, buysToday, bumpBuys, getEverOwned, recordEverOwned, getNick, setNick,
   };
 })();

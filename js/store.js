@@ -1,10 +1,14 @@
 const WYStore = (() => {
   const KEY = 'wy_progress_v1';
 
-  const DAILY_INK_CAP = 80; // 每日「答對賺取」墨錠上限（白帽稀缺性；花費/退款不受限）
+  const DAILY_INK_CAP = 200; // 約 80–100 題；花費／退款不受限
+  const MAX_IMPORT_INK = 2000;
+  const MASTERY_RULE_TEXT = '精通＝至少自測 10 題、答對率達 80%，且字義、句義、段旨、篇章文意四種題型各答對至少 2 題。';
+  const INK_BY_TYPE = { char: 1, sentence: 2, gist: 3, theme: 4, cloze: 1 };
+  const HINT_TICKET_COST = 30;
 
   function blank() {
-    return { texts: {}, streak: { last: null, days: 0 }, inkIngots: 0, classCode: null, inkDay: { date: null, earned: 0 }, lastTextId: null, recent: [] };
+    return { texts: {}, streak: { last: null, days: 0, best: 0, firePasses: 2 }, inkIngots: 0, hintTickets: 0, caotangDecorPurchases: 0, classCode: null, inkDay: { date: null, earned: 0 }, lastTextId: null, recent: [] };
   }
 
   const RECENT_WINDOW = 8; // 心流訊號：只看最近 N 題滾動正確率，用於連錯救援／難度自適應（不看終身累計）
@@ -56,7 +60,7 @@ const WYStore = (() => {
     if (t.total < MASTERY_MIN_TOTAL) return false;
     if (t.correct / t.total < MASTERY_MIN_RATIO) return false;
     const types = t.types || {};
-    return QUIZ_TYPES.every((ty) => (types[ty]?.total || 0) >= MASTERY_MIN_PER_TYPE);
+    return QUIZ_TYPES.every((ty) => (types[ty]?.correct || 0) >= MASTERY_MIN_PER_TYPE);
   }
 
   // ── per-item 間隔複習 / 錯題本（SRS）：SRS「今天複習」、錯題重測、閃卡自評三者共用同一份 state.items ──
@@ -103,7 +107,7 @@ const WYStore = (() => {
     const mile = _touchStudyStreakInto(state); // 連續天數綁「真的有練」而非「有開站」（教育誠信）
     if (mile) state._pendingStreakMilestone = mile; // 跨里程碑（7/14/30…）供 UI 慶祝一次
     state.recent = [...(state.recent || []), !!isCorrect].slice(-RECENT_WINDOW); // 滾動正確率訊號
-    if (isCorrect) _earnInkInto(state, 2); // 對戰答對仍給墨錠（受每日上限）
+    if (isCorrect) _earnInkInto(state, INK_BY_TYPE[qType] || 1);
     if (countForMastery) {
       t.total += 1;
       if (isCorrect) t.correct += 1;
@@ -117,7 +121,9 @@ const WYStore = (() => {
         state.byType[qType].total += 1;
         if (isCorrect) state.byType[qType].correct += 1;
       }
-      t.mastered = computeMastered(t);
+      const newlyMastered = !t.mastered && computeMastered(t);
+      t.mastered = t.mastered || newlyMastered;
+      if (newlyMastered) _earnInkInto(state, 20);
     }
     save(state);
     return t;
@@ -191,12 +197,19 @@ const WYStore = (() => {
   // 連續學習天數：只在「今天真的練了（recordAnswer）」時前進，不因單純開站而+1（教育誠信）。
   // 回傳 { streak, milestone } —— milestone 為本次跨過的里程碑天數（7/14/30/50/100），否則 null。
   function _touchStudyStreakInto(state) {
-    if (!state.streak) state.streak = { last: null, days: 0 };
+    if (!state.streak) state.streak = { last: null, days: 0, best: 0, firePasses: 2 };
     const today = new Date().toISOString().slice(0, 10);
     if (state.streak.last === today) return null; // 今天已記過，不重複前進
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    state.streak.days = state.streak.last === yesterday ? state.streak.days + 1 : 1;
+    const beforeYesterday = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    if (state.streak.last === yesterday) state.streak.days += 1;
+    else if (state.streak.last === beforeYesterday && (state.streak.firePasses || 0) > 0) {
+      state.streak.days += 1;
+      state.streak.firePasses -= 1;
+      state._usedFirePass = true;
+    } else state.streak.days = 1;
     state.streak.last = today;
+    state.streak.best = Math.max(state.streak.best || 0, state.streak.days);
     const MILES = [7, 14, 30, 50, 100, 200, 365];
     return MILES.includes(state.streak.days) ? state.streak.days : null;
   }
@@ -221,6 +234,16 @@ const WYStore = (() => {
     const m = state._pendingStreakMilestone || null;
     if (m) { delete state._pendingStreakMilestone; save(state); }
     return m;
+  }
+
+  function peekStreakMilestone() { return load()._pendingStreakMilestone || null; }
+
+  function streakAlive() {
+    const s = getStreak();
+    if (!s.last) return false;
+    const today = todayStr();
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    return s.last === today || s.last === yesterday;
   }
 
   // ── 續玩落點 / 滾動正確率（心流訊號）─────────────────────────────
@@ -254,13 +277,66 @@ const WYStore = (() => {
     let obj;
     try { obj = JSON.parse(str); } catch { return -1; }
     if (!obj || obj._wy_backup !== 1 || !obj.data || typeof obj.data !== 'object') return -1;
-    let n = 0;
     try {
-      for (const [k, v] of Object.entries(obj.data)) {
-        if (k.startsWith('wy_') && typeof v === 'string') { localStorage.setItem(k, v); n++; }
+      const raw = obj.data[KEY];
+      if (typeof raw !== 'string') return 0;
+      const incoming = JSON.parse(raw);
+      const current = load();
+      const merged = { ...current, texts: { ...current.texts } };
+      for (const [id, x] of Object.entries(incoming.texts || {})) {
+        if (!/^t\d{2}$/.test(id) || !x || typeof x !== 'object') continue;
+        const c = merged.texts[id] || { correct: 0, total: 0, types: {} };
+        const total = Math.min(10000, Math.max(c.total || 0, Number(x.total) || 0));
+        const correct = Math.min(total, Math.max(c.correct || 0, Number(x.correct) || 0));
+        const types = { ...(c.types || {}) };
+        for (const ty of QUIZ_TYPES) {
+          const xt = (x.types || {})[ty] || {};
+          const ct = types[ty] || {};
+          const tyTotal = Math.min(total, Math.max(ct.total || 0, Number(xt.total) || 0));
+          types[ty] = { total: tyTotal, correct: Math.min(tyTotal, Math.max(ct.correct || 0, Number(xt.correct) || 0)) };
+        }
+        const next = { ...c, total, correct, types, mastered: false };
+        next.mastered = computeMastered(next);
+        merged.texts[id] = next;
       }
+      merged.inkIngots = Math.min(MAX_IMPORT_INK, Math.max(current.inkIngots || 0, Number(incoming.inkIngots) || 0));
+      merged.hintTickets = Math.min(99, Math.max(current.hintTickets || 0, Number(incoming.hintTickets) || 0));
+      save(merged);
     } catch { return -1; }
-    return n;
+    return 1;
+  }
+
+  function totalCorrect() {
+    return Object.values(load().texts || {}).reduce((sum, t) => sum + (t.correct || 0), 0);
+  }
+  function companionLevel() { return Math.floor(totalCorrect() / 20); }
+  function getHintTickets() { return load().hintTickets || 0; }
+  function buyHintTicket() {
+    const state = load();
+    if ((state.inkIngots || 0) < HINT_TICKET_COST) return false;
+    state.inkIngots -= HINT_TICKET_COST;
+    state.hintTickets = (state.hintTickets || 0) + 1;
+    save(state); return true;
+  }
+  function useHintTicket() {
+    const state = load();
+    if ((state.hintTickets || 0) < 1) return false;
+    state.hintTickets -= 1; save(state); return true;
+  }
+  function buyCaotangDecor(cost = 45) {
+    const state = load();
+    if ((state.inkIngots || 0) < cost) return false;
+    state.inkIngots -= cost;
+    state.caotangDecorPurchases = (state.caotangDecorPurchases || 0) + 1;
+    save(state); return true;
+  }
+  function removeItems(qIds) {
+    const state = load();
+    for (const id of qIds || []) {
+      if (state.items) delete state.items[id];
+      if (state.wrong) delete state.wrong[id];
+    }
+    save(state);
   }
 
   // ── 墨錠貨幣（文魄合契的合契費、文房市集的交易幣共用）──────────────
@@ -302,8 +378,10 @@ const WYStore = (() => {
   return {
     load, save, getTextState, recordAnswer, recordItem, masteryRatio, allMastered, touchStreak, getStreak,
     getInk, addInk, spendInk, earnInk, inkToday, DAILY_INK_CAP, typeStats, getClassCode, setClassCode,
-    computeMastered, dueItems, dueCount, wrongItems, dayNum,
-    getLastTextId, recentAccuracy, studiedToday, consumeStreakMilestone, exportAll, importAll,
+    computeMastered, dueItems, dueCount, wrongItems, dayNum, removeItems,
+    getLastTextId, recentAccuracy, studiedToday, consumeStreakMilestone, peekStreakMilestone, streakAlive, exportAll, importAll,
+    MASTERY_RULE_TEXT, INK_BY_TYPE, HINT_TICKET_COST, getHintTickets, buyHintTicket, useHintTicket, buyCaotangDecor,
+    totalCorrect, companionLevel,
   };
 })();
 

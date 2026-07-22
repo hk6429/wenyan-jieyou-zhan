@@ -34,8 +34,10 @@ const WYWenhao = (() => {
         progress: st.total > 0 ? Math.round(ratio * 100) : 0,
         img: PORTRAIT[t.id] || '',
         person: g ? g.person : null,
+        worry: t.worry || '',
+        worryEcho: t.worryEcho || '',
         // 重逢台詞：本篇與同人另一篇「都已解鎖」時才亮，讓學生認出是同一個人
-        reunion: (g && st.mastered && othersMastered) ? g.reunion : null,
+        reunion: (g && st.mastered && othersMastered && t.id === [...g.ids].sort().at(-1)) ? g.reunion : null,
       };
     });
   }

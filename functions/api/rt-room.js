@@ -22,7 +22,10 @@ const SEASON_TTL = 100 * 86400; // 賽季榜可回顧上季
 
 const keyOf = (code) => `wy_rt:room:${code}`;
 const chKey = (code) => `wy_rt:ch:${code}`;
-const seasonKey = (s) => `wy_rt:season:${s}`;
+const seasonKey = (s, classCode = '') => `wy_rt:season:${classCode || 'global'}:${s}`;
+const seasonTokenKey = (t) => `wy_rt:season-token:${t}`;
+const okClass = (c) => !c || /^[A-Z0-9]{4,8}$/.test(String(c).toUpperCase());
+const token = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const clamp = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
 const stripBad = (x) => String(x ?? '').replace(/[<>&"']/g, '');
@@ -198,26 +201,48 @@ export async function onRequestPost({ request, env }) {
       if (!okChCode(code) || !okNick(nick)) return reply(request, { ok: 0, error: '資料不完整' });
       const c = parse(await kv.get(chKey(code)));
       if (!c) return reply(request, { ok: 0, error: '戰帖不存在或已過期' });
-      const accepter = { nick: stripBad(nick).trim().slice(0, 12), score: clamp(score, 999999), ts: Date.now() };
+      if (c.settled) return reply(request, { ok: 0, error: '這張戰帖已結算' });
+      const accepter = { nick: stripBad(nick).trim().slice(0, 12), score: clamp(score, 999999), correct: clamp(body.correct, 30), ts: Date.now() };
       c.accepter = accepter;
+      c.settled = true;
       await kv.set(chKey(code), JSON.stringify(c), { ex: CH_TTL });
-      return reply(request, { ok: 1, challenger: { nick: c.nick, score: c.score }, accepter: { nick: accepter.nick, score: accepter.score } });
+      const st = token();
+      const win = accepter.score > c.score;
+      await kv.set(seasonTokenKey(st), JSON.stringify({ nick: accepter.nick, pts: win ? accepter.correct + 2 : 0, classCode: okClass(body.classCode) ? String(body.classCode || '').toUpperCase() : '' }), { ex: 600 });
+      return reply(request, { ok: 1, seasonToken: st, challenger: { nick: c.nick, score: c.score }, accepter: { nick: accepter.nick, score: accepter.score } });
+    }
+
+    if (op === 'seasonToken') {
+      const { code, role, nick } = body;
+      if (!okCode(code) || !okRole(role) || !okNick(nick)) return reply(request, { ok: 0, error: 'bad req' }, 400);
+      const rec = parse(await kv.get(`${keyOf(code)}:${role}`));
+      if (!rec || !rec.state || !rec.state.done) return reply(request, { ok: 0, error: '對戰尚未完成' });
+      const onceKey = `${keyOf(code)}:${role}:seasoned`;
+      if (await kv.exists(onceKey)) return reply(request, { ok: 0, error: '本場已結算' });
+      await kv.set(onceKey, '1', { ex: TTL });
+      const st = token();
+      await kv.set(seasonTokenKey(st), JSON.stringify({ nick: stripBad(nick).trim().slice(0, 12), pts: clamp(rec.state.correct, 30) + (body.verdict === 'win' ? 2 : 0), classCode: okClass(body.classCode) ? String(body.classCode || '').toUpperCase() : '' }), { ex: 600 });
+      return reply(request, { ok: 1, seasonToken: st });
     }
 
     // —— 科舉賽季排位 ——
     if (op === 'seasonAdd') {
-      const { nick } = body;
-      if (!okNick(nick)) return reply(request, { ok: 0, error: 'bad req' }, 400);
+      const rec = parse(await kv.get(seasonTokenKey(String(body.seasonToken || ''))));
+      if (!rec) return reply(request, { ok: 0, error: '賽季憑證無效或已使用' }, 403);
+      await kv.del(seasonTokenKey(String(body.seasonToken || '')));
       const season = new Date().toISOString().slice(0, 7); // 伺服器自算，不信任 client
-      const pts = clamp(body.pts, 20); // 單場上限 20
-      const total = await kv.zincrby(seasonKey(season), pts, stripBad(nick).trim().slice(0, 12));
-      await kv.expire(seasonKey(season), SEASON_TTL);
+      const day = new Date().toISOString().slice(0, 10);
+      if ((await kv.incr(`wy_rt:season-daily:${day}:${rec.nick}`, 2 * 86400)) > 20) return reply(request, { ok: 0, error: '今日賽季場次已達上限' }, 429);
+      const total = await kv.zincrby(seasonKey(season, rec.classCode), rec.pts, rec.nick);
+      await kv.expire(seasonKey(season, rec.classCode), SEASON_TTL);
+      if (rec.classCode) { await kv.zincrby(seasonKey(season), rec.pts, rec.nick); await kv.expire(seasonKey(season), SEASON_TTL); }
       return reply(request, { ok: 1, total });
     }
 
     if (op === 'seasonTop') {
       const season = /^\d{4}-\d{2}$/.test(String(body.season || '')) ? body.season : new Date().toISOString().slice(0, 7);
-      const flat = await kv.zrange(seasonKey(season), 0, 9, { rev: true, withScores: true });
+      const classCode = okClass(body.classCode) ? String(body.classCode || '').toUpperCase() : '';
+      const flat = await kv.zrange(seasonKey(season, classCode), 0, 9, { rev: true, withScores: true });
       const top = [];
       for (let i = 0; i < flat.length; i += 2) top.push({ nick: flat[i], pts: Number(flat[i + 1]) });
       return reply(request, { ok: 1, season, top });
