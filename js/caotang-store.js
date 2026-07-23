@@ -2,7 +2,7 @@
  * 山門十境／三院落繁茂度／精通掛軸／裝飾實體化／名句池／匾額對聯／慶典 全部由既有進度唯讀 derive。
  * 自有 localStorage key `wy_caotang`（擺放/命名/慶典），絕不寫回 wy_progress_v1。
  * 相容雙載入：瀏覽器 <script>（掛 window.WYCaotangStore）＋ Node ESM 副作用 import（掛 globalThis.WYCaotangStore）。
- * 精通判定自己重算（total>=8 且答對率>=0.8），不依賴 WYStore 內部旗標，方便單元測試傳純物件。
+ * 精通判定自己重算（total>=10、答對率>=0.8 且四題型各答對至少 2 題），不依賴 WYStore 內部旗標。
  */
 (function (root) {
   'use strict';
@@ -31,12 +31,14 @@
     { id: 'cangshu', name: '藏書閣', kind: 'answers', desc: '累計答題量' },
   ];
 
-  // 學習量裝飾：以「累計答對題數」換算件數（分品階門檻），各自獨立、皆有上限避免撐爆畫面
+  // 裝飾仍需累計真實答對，但可繁茂的上限由精通篇數逐步解鎖，避免靠單篇刷題灌滿庭園。
   const DECOR_KINDS = {
-    bamboo: { name: '翠竹叢', per: 8, cap: 12, emoji: '🎋' },
-    lotus: { name: '蓮池', per: 20, cap: 6, emoji: '🪷' },
-    pine: { name: '松石', per: 40, cap: 5, emoji: '🪨' },
-    koi: { name: '錦鯉', per: 60, cap: 6, emoji: '🐟' },
+    bamboo: { name: '翠竹叢', per: 8, cap: 12, masteryPerCap: 1, emoji: '🎋' },
+    lotus: { name: '蓮池', per: 20, cap: 6, masteryPerCap: 2, emoji: '🪷' },
+    pine: { name: '松石', per: 40, cap: 5, masteryPerCap: 3, emoji: '🪨' },
+    koi: { name: '錦鯉', per: 60, cap: 6, masteryPerCap: 4, emoji: '🐟' },
+    // 限定・仙鶴：純外觀，靠墨錠（真實答對賺來）於市集購入解鎖，不綁答題量／精通篇；白帽——僅裝飾不影響學習判定。
+    crane: { name: '限定・仙鶴', cap: 4, emoji: '🕊️', purchased: true },
   };
 
   // 預設散佈分帶（百分比座標，相對場景）
@@ -45,6 +47,7 @@
     lotus: { x0: 56, y0: 82, dx: 7, dy: -2, wrap: 6 },
     pine: { x0: 12, y0: 28, dx: 9, dy: 2, wrap: 5 },
     koi: { x0: 62, y0: 74, dx: 5, dy: 3, wrap: 6 },
+    crane: { x0: 40, y0: 46, dx: 10, dy: -2, wrap: 4 },
   };
 
   // 名句池「代表句」白名單：只在該句確實是原文子字串時才採用，否則落回程式化擷取（杜絕捏造）
@@ -212,11 +215,19 @@
   }
 
   // ── 學習量裝飾實體化 ──────────────────────────────────────
-  function decorCounts(progress) {
+  function decorCounts(texts, progress) {
     const correct = totalCorrect(progress);
+    const masteredCount = masteredTexts(texts, progress).length;
     const out = {};
     for (const [kind, def] of Object.entries(DECOR_KINDS)) {
-      out[kind] = Math.min(def.cap, Math.floor(correct / def.per));
+      if (def.purchased) {
+        // 限定外觀：數量 = 已購入次數（存於 WYStore 進度 state），封頂於 def.cap。
+        const bought = (progress && progress.caotangDecorPurchases) || 0;
+        out[kind] = Math.min(def.cap, bought);
+        continue;
+      }
+      const masteryCap = masteredCount ? Math.ceil(masteredCount / def.masteryPerCap) : 0;
+      out[kind] = Math.min(def.cap, masteryCap, Math.floor(correct / def.per));
     }
     return out;
   }
@@ -228,7 +239,7 @@
   }
 
   function decorations(texts, progress, state) {
-    const counts = decorCounts(progress);
+    const counts = decorCounts(texts, progress);
     const placements = (state && state.placements) || {};
     const out = [];
     for (const [kind, def] of Object.entries(DECOR_KINDS)) {

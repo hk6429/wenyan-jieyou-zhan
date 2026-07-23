@@ -5,6 +5,12 @@
   "type": "module",
   "scripts": {
     "validate": "node scripts/validate.mjs",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:ui": "node test/smoke.mjs",
+    "verify": "npm run validate && npm test && npm run test:ui",
     "dev": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "playwright-core": "1.61.1"
   }
 }

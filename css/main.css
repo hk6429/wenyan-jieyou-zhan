@@ -107,14 +107,14 @@ nav.tabs {
   display: flex;
   overflow-x: auto;
   gap: 2px;
-  padding: 6px 8px 0;
+  padding: 6px 4px 0;
   background: var(--paper-warm);
   border-bottom: 1px solid var(--line);
 }
 
 nav.tabs button {
   flex: 1;
-  min-width: 80px;
+  min-width: 68px;
   padding: 10px 6px 12px;
   border: none;
   border-radius: 8px 8px 0 0;
@@ -282,17 +282,19 @@ button.primary:active { transform: scale(.97); }
   position: relative;
   width: 100%;
   min-height: 180px;
+  display: grid;                 /* 兩面同格堆疊：容器高度自動取較高的一面，長解析不再溢出 */
   transition: transform .5s cubic-bezier(.4,.2,.2,1);
   transform-style: preserve-3d;
 }
 .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
 .flashcard-face {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;              /* 兩面重疊在同一格 */
+  min-width: 0;                  /* 允許長內文換行，不被 grid 撐爆 */
   backface-visibility: hidden;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 16px;
+  overflow-wrap: break-word;     /* 超長不斷詞的內容仍能斷行 */
 }
 .flashcard-front {
   background: var(--paper);
@@ -611,6 +613,12 @@ button.primary:active { transform: scale(.97); }
   cursor: pointer;
 }
 .guide-reopen:hover { color: var(--zhu); border-color: var(--zhu); }
+.teacher-launch {
+  min-height: 44px; padding: 8px 12px; border: 1px solid var(--dai); border-radius: 8px;
+  background: var(--paper); color: var(--dai); font-family: var(--font-ui); font-weight: 700;
+  cursor: pointer; white-space: nowrap; box-shadow: 0 1px 5px rgba(26,22,19,.12);
+}
+.teacher-launch:hover { background: var(--paper-warm); border-color: var(--zhu); color: var(--zhu); }
 .ink-today { display: block; font-family: var(--font-ui); font-size: .75rem; font-weight: 500; color: var(--ink-dan); letter-spacing: .02em; margin-top: 1px; }
 .ink-today-full { color: var(--zhu); }
 
@@ -620,7 +628,7 @@ nav.tabs.tabs-sub button { flex: 1; font-size: .82rem; padding: 7px 6px 8px; min
 nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .tabs-sub-label {
   flex: 0 0 auto; font-family: var(--font-brush); font-size: .8rem;
-  color: var(--ink-qing); padding: 0 6px 0 2px; letter-spacing: .1em;
+  color: var(--ink-dan); padding: 0 6px 0 2px; letter-spacing: .1em;
 }
 
 /* 拆分學段／精通率徽章 */
@@ -662,12 +670,15 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 
 @media (max-width: 480px) {
   main { padding: 10px; }
-  header.hero { min-height: 188px; }
+  header.hero { min-height: 150px; }
+  header.hero .header-row { gap: 6px; }
   header.hero h1 { font-size: 2rem; }
   .hero-tag { font-size: 1.02rem; letter-spacing: .1em; }
   .hero-sub { font-size: .74rem; }
-  .hero-title { max-width: 60%; }
+  .hero-title { max-width: 50%; }
+  .header-tools { flex: 0 0 46%; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .ink-hud { font-size: 1rem; padding: 3px 11px; }
+  .teacher-launch { flex: 1 0 100%; padding: 7px 9px; font-size: .82rem; }
 }
 
 
@@ -740,6 +751,22 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .worry-ancient{ font-family:var(--font-read); font-size:1.02rem; color:var(--ink-nong); margin:.1em 0 .4em; line-height:1.6; }
 .worry-echo{ color:var(--ink-dan); font-size:.9rem; margin:0; }
 
+/* 「怎麼讀這一篇」閱讀理解策略卡 */
+.strategy-card{ background:linear-gradient(180deg,var(--paper-warm),var(--paper)); border-left:4px solid var(--dai); padding:0; overflow:hidden; }
+.strategy-summary{ cursor:pointer; list-style:none; padding:14px 16px; font-family:var(--font-brush); font-size:1.05rem; color:var(--dai); font-weight:700; display:flex; align-items:baseline; flex-wrap:wrap; gap:.5em; }
+.strategy-summary::-webkit-details-marker{ display:none; }
+.strategy-summary::after{ content:'▸'; margin-left:auto; transition:transform .2s; color:var(--ink-dan); }
+.strategy-card[open] .strategy-summary::after{ transform:rotate(90deg); }
+.strategy-hint{ font-family:var(--font-body,inherit); font-size:.74rem; font-weight:400; color:var(--ink-dan); letter-spacing:.04em; }
+.strategy-body{ padding:2px 16px 16px; }
+.strategy-sub{ font-size:.8rem; color:var(--zhu); letter-spacing:.06em; margin:.8em 0 .35em; font-weight:700; }
+.strategy-steps{ margin:.2em 0 .2em; padding-left:1.4em; }
+.strategy-steps li{ margin:.3em 0; line-height:1.6; color:var(--ink-nong); }
+.strategy-steps b{ color:var(--ink-jiao); }
+.strategy-focus{ margin:.2em 0; padding-left:1.2em; list-style:'✦　'; }
+.strategy-focus li{ margin:.35em 0; line-height:1.65; color:var(--ink-nong); font-family:var(--font-read); }
+.strategy-summary:focus-visible{ outline:2px solid var(--dai); outline-offset:-2px; }
+
 /* ① 短回合結算卡 */
 @keyframes settle-in{ from{ transform:translateY(14px) scale(.96); opacity:0 } to{ transform:none; opacity:1 } }
 .settle-card{ text-align:center; padding:22px 18px; animation:settle-in .35s ease-out; }
@@ -778,8 +805,12 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .options button.pop{ animation:pop-in .22s ease-out; }
 .quiz-question-card{ position:relative; animation:settle-in .16s ease-out; }
 .yanling-companion{ position:absolute; right:10px; top:8px; display:flex; flex-direction:column; align-items:center; font-size:1.25rem; }
+.yanling-companion .yanling-art{ width:48px; height:48px; object-fit:contain; filter:drop-shadow(0 1px 2px rgba(0,0,0,.18)); }
 .yanling-companion small{ font-size:.7rem; color:var(--ink-dan); }
 .yanling-companion.cheer{ animation:pop-in .45s ease-out; }
+@keyframes yanling-gold{ 0%,100%{ filter:drop-shadow(0 0 4px rgba(181,132,40,.55)); } 50%{ filter:drop-shadow(0 0 12px rgba(181,132,40,.95)); } }
+.yanling-companion.yanling-golden .yanling-art{ animation:yanling-gold 2.4s ease-in-out infinite; }
+.yanling-companion.yanling-golden small{ color:#725012; font-weight:700; background:rgba(247,242,231,.9); padding:1px 5px; border-radius:999px; }
 .combo-chip{ position:absolute; right:12px; top:52px; z-index:4; padding:3px 9px; border-radius:999px; background:var(--paper-aged); color:var(--zhu); font-size:.78rem; animation:pop-in .4s ease-out; }
 .class-join-card input{ min-width:90px; max-width:130px; padding:8px; }
 .settle-mood,.settle-companion{ color:var(--ink-dan); font-size:.86rem; }
@@ -834,3 +865,25 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .wenhao-finale{ background:linear-gradient(180deg,#fff8e8,var(--paper)); box-shadow:0 0 0 2px var(--zhu-light) inset, var(--shadow-paper); }
 .wenhao-finale p{ line-height:1.7; }
 .wenhao-reunion{ margin-top:8px; padding:8px 10px; border-top:1px dashed var(--ink-qing); font-size:.82rem; color:var(--yan); font-family:var(--font-read); line-height:1.5; }
+
+/* 第二批：週卷、難度排序、頁尾統計 */
+.weekly-card{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left; color:var(--ink-nong); cursor:pointer; font:inherit; border-left:4px solid var(--yan); }
+.weekly-card span{ display:flex; flex-direction:column; gap:3px; }
+.weekly-card small,.weekly-note{ color:var(--ink-dan); font-size:.78rem; }
+.weekly-card > strong{ color:var(--zhu); white-space:nowrap; }
+.list-tools{ display:flex; justify-content:flex-end; align-items:center; gap:8px; margin:8px 2px; color:var(--ink-dan); font-size:.82rem; }
+.list-tools select{ min-height:44px; padding:6px 28px 6px 10px; color:var(--ink-nong); background:var(--paper); border:1px solid var(--ink-dan); border-radius:8px; font:inherit; }
+.site-footer{ max-width:720px; margin:4px auto 20px; padding:8px 16px; text-align:center; color:var(--ink-dan); font-size:.75rem; }
+.visitor-badge{ min-width:80px; min-height:20px; vertical-align:middle; }
+.ct-decor.is-keyboard-moving{ outline:3px solid var(--zhu); outline-offset:3px; }
+
+/* 手機只把五個核心分頁移到底部；江湖次導覽仍留在原本內容上方。 */
+@media (max-width: 480px) {
+  body{ padding-bottom:72px; }
+  nav.tabs:not(.tabs-sub){ position:fixed; left:0; right:0; bottom:0; z-index:80; padding:4px 2px max(4px,env(safe-area-inset-bottom)); border-top:1px solid var(--line); border-bottom:0; box-shadow:0 -4px 16px rgba(26,22,19,.12); }
+  nav.tabs:not(.tabs-sub) button{ min-width:0; min-height:52px; padding:7px 2px 8px; border-radius:8px; border-bottom-width:2px; font-size:.82rem; }
+  nav.tabs.tabs-sub{ position:relative; bottom:auto; }
+  .weekly-card{ align-items:flex-start; }
+  .weekly-card > strong{ white-space:normal; text-align:right; }
+  .site-footer{ margin-bottom:8px; }
+}

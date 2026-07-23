@@ -315,7 +315,7 @@ const WYMarket = (() => {
     body.innerHTML = `
       <div class="card mkt-yanling-head">
         <p class="mkt-sub">🖋️ 硯靈平日擺攤：凡品、良品與純外觀都有，隨買隨得；不販售精通捷徑。</p>
-        <div class="mkt-card-main"><button class="primary" id="buyHint">30 墨・提示券（現有 ${WYStore.getHintTickets()}）</button><button class="primary" id="buyDecor">45 墨・限定草堂外觀</button></div>
+        <div class="mkt-card-main"><button class="primary" id="buyHint">30 墨・提示券（現有 ${WYStore.getHintTickets()}）</button><button class="primary" id="buyDecor">45 墨・限定仙鶴（庭園，至多 4 隻）</button></div>
       </div>
       <div class="mkt-list">
         ${stock.map((g) => `
@@ -342,7 +342,7 @@ const WYMarket = (() => {
       };
     });
     document.getElementById('buyHint').onclick = () => { if (!WYStore.buyHintTicket()) return toast('墨錠不足'); toast('提示券已入袋；答錯時可排除一個誘答。'); draw(); };
-    document.getElementById('buyDecor').onclick = () => { if (!WYStore.buyCaotangDecor()) return toast('墨錠不足'); toast('草堂限定外觀已收藏！'); draw(); };
+    document.getElementById('buyDecor').onclick = () => { const r = WYStore.buyCaotangDecor(); if (r === 'capped') return toast('仙鶴已滿（庭園上限 4 隻）'); if (!r) return toast('墨錠不足'); toast('限定仙鶴已入庭園！到解憂草堂看看～'); draw(); };
   }
 
   // —— 設定班級與道號 ——

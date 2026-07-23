@@ -23,7 +23,17 @@ const WYLiveWall = (() => {
     ];
   }
 
-  // 老師戰情室：把每位學生的逐題對錯字串（hist，'1010…'，index 0 = 第1題）聚成「逐題正確率」。
+  function histAnswer(hist, qNo) {
+    if (hist && typeof hist === 'object' && !Array.isArray(hist)) {
+      const value = hist[qNo] ?? hist[String(qNo)];
+      return value === 1 || value === '1' ? 1 : value === 0 || value === '0' ? 0 : null;
+    }
+    const legacy = String(hist || '');
+    const value = legacy[qNo - 1];
+    return value === '1' ? 1 : value === '0' ? 0 : null;
+  }
+
+  // 老師戰情室：以題號聚合逐題對錯；新格式 hist={題號:0|1}，並相容舊字串。
   // 回 [{ qNo, correct, answered, pct, cold }]，cold=正確率<50%（隔天課堂該講評的題）。qn=本場題數。
   function questionHotspots(rows, qn) {
     const n = Math.max(0, Math.round(qn) || 0);
@@ -31,8 +41,8 @@ const WYLiveWall = (() => {
     for (let j = 0; j < n; j++) {
       let correct = 0, answered = 0;
       for (const r of rows) {
-        const h = String(r.hist || '');
-        if (j < h.length) { answered++; if (h[j] === '1') correct++; }
+        const value = histAnswer(r.hist, j + 1);
+        if (value !== null) { answered++; if (value === 1) correct++; }
       }
       const pct = answered ? Math.round(correct / answered * 100) : null;
       out.push({ qNo: j + 1, correct, answered, pct, cold: pct !== null && pct < 50 });
@@ -40,6 +50,59 @@ const WYLiveWall = (() => {
     return out;
   }
 
-  return { safeBoard, buildHerald, questionHotspots };
+  function buildTeacherReview({ rows = [], questions = [] } = {}) {
+    const hotspots = questionHotspots(rows, questions.length);
+    return hotspots.map((spot, index) => {
+      const q = questions[index] || {};
+      const options = Array.isArray(q.options) ? q.options : [];
+      return {
+        qNo: spot.qNo,
+        stem: String(q.stem || ''),
+        answer: String(options[q.answerIdx] ?? ''),
+        correct: spot.correct,
+        answered: spot.answered,
+        missing: Math.max(0, rows.length - spot.answered),
+        pct: spot.pct,
+        needsReview: spot.cold,
+      };
+    });
+  }
+
+  function csvCell(value) {
+    const text = String(value ?? '');
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  function teacherReviewCsv(review = []) {
+    const header = ['題號', '題幹', '正解', '有效作答N', '缺答N', '正確率', '是否需講評'];
+    const lines = review.map((row) => [
+      row.qNo,
+      row.stem,
+      row.answer,
+      row.answered,
+      row.missing,
+      row.pct == null ? '—' : `${row.pct}%`,
+      row.needsReview ? '是' : '否',
+    ].map(csvCell).join(','));
+    return `\uFEFF${[header.join(','), ...lines].join('\r\n')}`;
+  }
+
+  function htmlText(value) {
+    return String(value ?? '').replace(/[<>&"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[char]));
+  }
+
+  function teacherReviewPrintHtml({ code = '', review = [] } = {}) {
+    const rows = review.map((row) => `<tr class="${row.needsReview ? 'needs-review' : ''}">
+      <td>${htmlText(row.qNo)}</td><td>${htmlText(row.stem)}</td><td>${htmlText(row.answer)}</td>
+      <td>${htmlText(row.answered)}</td><td>${htmlText(row.missing)}</td>
+      <td>${row.pct == null ? '—' : `${htmlText(row.pct)}%`}</td><td>${row.needsReview ? '是' : '否'}</td>
+    </tr>`).join('');
+    return `<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><title>本場講評・${htmlText(code)}</title>
+      <style>body{font-family:system-ui,sans-serif;color:#241f1b;margin:24px}h1{font-size:22px}p{color:#665c52}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #aaa;padding:7px;text-align:left;vertical-align:top}.needs-review{background:#fde8e5}@media print{body{margin:12mm}}</style>
+      </head><body><h1>本場講評・${htmlText(code)}</h1><p>本表不含學生姓名，僅供教師依全班匿名作答統計安排講評。</p>
+      <table><thead><tr><th>題號</th><th>題幹</th><th>正解</th><th>有效作答N</th><th>缺答N</th><th>正確率</th><th>是否需講評</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+  }
+
+  return { safeBoard, buildHerald, questionHotspots, buildTeacherReview, teacherReviewCsv, teacherReviewPrintHtml };
 })();
 if (typeof globalThis !== 'undefined') globalThis.WYLiveWall = WYLiveWall;

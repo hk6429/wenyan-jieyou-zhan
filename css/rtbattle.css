@@ -63,6 +63,12 @@
 .rt-hpn { font-size: .72rem; color: var(--ink-dan); }
 .rt-vs { font-size: .72rem; color: var(--ink-dan); white-space: nowrap; text-align: center; }
 .rt-hud--solo { flex-direction: column; text-align: center; }
+/* 硯靈化身對手立繪 */
+.rt-opp-art { width: 34px; height: 34px; object-fit: contain; float: right; margin-left: .3rem; filter: drop-shadow(0 1px 2px rgba(0,0,0,.18)); }
+.rt-yl-emoji { font-size: 1.4rem; }
+.rt-bot-face { text-align: center; margin: .4rem 0 .8rem; }
+.rt-bot-art { width: 88px; height: 88px; object-fit: contain; display: block; margin: 0 auto .25rem; filter: drop-shadow(0 2px 5px rgba(0,0,0,.2)); }
+.rt-bot-face small { color: var(--ink-dan); font-size: .74rem; }
 
 /* 題目卡 */
 .rt-qtype { display: inline-block; font-size: .72rem; padding: .12rem .55rem; border-radius: 999px; background: var(--qing-shi); color: #fff; margin-bottom: .5rem; }
@@ -113,6 +119,17 @@
 
 .rt-herald { font-family: var(--font-read); line-height: 1.9; margin: .8rem 0; padding: .8rem 1rem; background: var(--paper-warm); border-radius: 10px; color: var(--ink-jiao); }
 .rt-host-state { margin: .6rem 0; font-size: .95rem; color: var(--dai); font-weight: 600; }
+.rt-privacy { color: var(--ink-dan); font-size: .82rem; line-height: 1.65; }
+.rt-review { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); text-align: left; }
+.rt-review h4 { margin: 0 0 .3rem; font-family: var(--font-brush); font-size: 1.15rem; color: var(--ink-jiao); }
+.rt-review-actions { display: flex; gap: .5rem; margin: .7rem 0; }
+.rt-review-actions .rt-btn { width: auto; flex: 1; align-items: center; }
+.rt-review-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.rt-review-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: .78rem; background: var(--paper); }
+.rt-review-table th, .rt-review-table td { padding: .5rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.rt-review-table th { position: sticky; top: 0; background: var(--paper-warm); color: var(--ink-zhong); white-space: nowrap; }
+.rt-review-table tr.needs-review { background: rgba(158,59,44,.09); }
+.rt-review-table td:first-child, .rt-review-table td:nth-last-child(-n+4) { white-space: nowrap; }
 
 .rt-err, .rt-err-card h3 { color: var(--zhu); font-size: .88rem; margin-top: .5rem; }
 .rt-degrade h3 { color: var(--qing-shi); }
@@ -121,4 +138,5 @@
 @media (max-width: 400px) {
   .rt-vs { font-size: .66rem; }
   .rt-btn { font-size: .95rem; }
+  .rt-review-actions { flex-direction: column; }
 }

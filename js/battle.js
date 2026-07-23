@@ -31,6 +31,13 @@ const WYBattle = (() => {
     { id: 'zhengyongxi', name: '開臺進士', hp: MAX_HP, atk: 21, unlockText: 't25', img: 'assets/characters/t25.png' },
     { id: 'honyi', name: '鹿港遺老', hp: MAX_HP, atk: 18, unlockText: 't26', img: 'assets/characters/t26.png' },
     { id: 'zhangdehe', name: '畫菊夫人', hp: MAX_HP, atk: 14, unlockText: 't27', img: 'assets/characters/t27.png' },
+    { id: 'lianjunzi', name: '蓮花君子', hp: MAX_HP, atk: 14, unlockText: 't28', img: 'assets/characters/t28.png' },
+    { id: 'maiyouweng', name: '酌油老翁', hp: MAX_HP, atk: 13, unlockText: 't29', img: 'assets/characters/t29.png' },
+    { id: 'tongquke', name: '童趣遊俠', hp: MAX_HP, atk: 15, unlockText: 't30', img: 'assets/characters/t30.png' },
+    { id: 'lunyuzi', name: '好學君子', hp: MAX_HP, atk: 16, unlockText: 't31', img: 'assets/characters/t31.png' },
+    { id: 'youhuanzhe', name: '憂患行者', hp: MAX_HP, atk: 18, unlockText: 't32', img: 'assets/characters/t32.png' },
+    { id: 'weixueseng', name: '力學貧僧', hp: MAX_HP, atk: 17, unlockText: 't33', img: 'assets/characters/t33.png' },
+    { id: 'dingbogui', name: '宛市奇鬼', hp: MAX_HP, atk: 15, unlockText: 't34', img: 'assets/characters/t34.png' },
   ];
 
   function newBattle(opponentId) {

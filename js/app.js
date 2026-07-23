@@ -10,11 +10,14 @@ let currentBattle = null;
 let segTabPreference = 'translation';
 let pendingQuizNote = null; // 從選文詳情頁「對戰作者」但尚未解鎖時，導去自測並提示
 let currentMoodFilter = null; // 心情選文篩選（今天想解什麼憂）
+let currentListSort = 'difficulty'; // 首頁選文預設由易入難，可切回原編排
 let pendingClassGoalAdd = 0;  // 待上報的班級集體答對數（節流批量送，減少後端請求）
 let currentRoundInkStart = 0; // 本輪開始時墨錠數（結算卡算本輪賺得）
 let currentQuizTag = null;    // 能力標籤專練篩選（虛詞/活用/…）
 let classGoalTimer = null;
 let currentRoundCompanionLevel = 0;
+let weeklyDeadline = 0;
+let weeklyTimerId = null;
 
 const SHORT_ROUND = 8; // 一輪短關題數：把「整篇馬拉松」切成可重複的爽脆小關（心流閉環）
 const START_TEXT_ID = 't06'; // 新手「從這篇開始」：〈詠雪〉短、輕快、好上手
@@ -128,14 +131,41 @@ async function boot() {
   renderTab('list');
 }
 
-// 新手收斂：首次精通任何一篇之前，隱藏「江湖」進階分頁列，把新手鎖在核心迴圈（讀→自測→對戰），
-// 避免亂點市集/擂台/合契撞到「你還不能用」的空頁死路（漸進揭露，非假鎖獎勵——功能本就依賴精通前置）。
+// 江湖採分級揭露：進階功能只隨「真正精通篇數」解鎖，避免新手一次面對四套系統。
 function updateJianghuNav() {
   const sub = document.querySelector('nav.tabs-sub');
   if (!sub) return;
-  const opened = WYStore.allMastered().length >= 1;
-  sub.style.display = '';
-  sub.querySelectorAll('button').forEach((b) => { b.style.display = (opened || b.dataset.tab === 'rt') ? '' : 'none'; });
+  const masteredCount = WYStore.allMastered().length;
+  const unlocked = {
+    caotang: masteredCount >= 1,
+    market: masteredCount >= 3,
+    fusion: masteredCount >= 5,
+    rt: masteredCount >= 5,
+  };
+  sub.style.display = masteredCount >= 1 ? '' : 'none';
+  sub.querySelectorAll('button').forEach((b) => { b.style.display = unlocked[b.dataset.tab] ? '' : 'none'; });
+}
+
+const SYSTEM_ONBOARDING = {
+  caotang: '草堂會把真正精通的篇目化成院落，讓累積的學習成果看得見。',
+  market: '市集讓你用真實答對賺到的墨錠，交換喜歡的文房收藏。',
+  fusion: '合契讓兩篇已精通文章相遇，解鎖專屬文魄能力。',
+  rt: '擂台用真實答對與同學較量，考驗的是讀懂，而不是猜位置。',
+};
+
+function showSystemOnboarding(tab) {
+  const copy = SYSTEM_ONBOARDING[tab];
+  if (!copy) return;
+  const key = `wy_system_intro_seen_${tab}`;
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+  } catch { /* 隱私模式仍顯示當次導覽 */ }
+  const card = document.createElement('div');
+  card.className = 'card guide-card system-onboarding';
+  card.setAttribute('role', 'status');
+  card.textContent = copy;
+  app.prepend(card);
 }
 
 // 分頁標題徽章：有到期複習題時把數字帶進 <title>，回訪者一眼看到「該回來清複習了」
@@ -164,16 +194,17 @@ function setActiveTab(tab) {
 }
 
 function renderTab(tab) {
+  if (tab !== 'quiz' && weeklyTimerId) { clearInterval(weeklyTimerId); weeklyTimerId = null; }
   updateInkHud();
   if (tab === 'list') return renderList();
   if (tab === 'flashcard') return renderFlashcard();
   if (tab === 'quiz') return renderQuiz();
   if (tab === 'battle') return renderBattle();
   if (tab === 'wenhao') return renderWenhao();
-  if (tab === 'caotang') return WYCaotang.render(app);
-  if (tab === 'fusion') return WYFusion.render(app);
-  if (tab === 'rt') return WYRt.render(app);
-  if (tab === 'market') return WYMarket.render(app);
+  if (tab === 'caotang') { WYCaotang.render(app); showSystemOnboarding(tab); return; }
+  if (tab === 'fusion') { WYFusion.render(app); showSystemOnboarding(tab); return; }
+  if (tab === 'rt') { WYRt.render(app); showSystemOnboarding(tab); return; }
+  if (tab === 'market') { WYMarket.render(app); showSystemOnboarding(tab); }
 }
 
 function renderList() {
@@ -199,8 +230,9 @@ function renderList() {
       </ol>
     </div>`;
 
-  // 新手收斂：第一次來就給「從這篇開始」單一入口，砍掉 27 篇等權清單的選擇癱瘓
+  // 新手收斂：第一次來就給「從這篇開始」單一入口，砍掉全站選文等權清單的選擇癱瘓
   const startText = TEXTS.find((x) => x.id === START_TEXT_ID) || TEXTS[0];
+  const beginnerIds = new Set(TEXTS.slice().sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id)).slice(0, 3).map((t) => t.id));
   const startHtml = isNew && startText ? `
     <div class="card start-card" id="startCard" role="button" tabindex="0">
       <span class="start-kicker">第一次來？就從這篇開始 ▸</span>
@@ -213,11 +245,13 @@ function renderList() {
     streakHtml + guideHtml + startHtml +
     (isNew ? '' : renderRenownBar()) +
     (isNew ? '' : renderHomeStatus()) +
+    renderWeeklyCard() +
     '<div id="classGoalSlot"></div>' +
     (isNew ? '' : renderMoodPicker()) +
     renderDashboard(answered) +
+    `<div class="list-tools"><label for="textSort">選文排序</label><select id="textSort"><option value="difficulty"${currentListSort === 'difficulty' ? ' selected' : ''}>由易到難</option><option value="original"${currentListSort === 'original' ? ' selected' : ''}>課程原順序</option></select></div>` +
     (isNew ? '<p class="list-heading">或自己挑一篇：</p>' : '') +
-    TEXTS.filter(moodMatch).map((t) => {
+    TEXTS.filter(moodMatch).sort((a, b) => currentListSort === 'difficulty' ? a.difficulty - b.difficulty || a.id.localeCompare(b.id) : a.id.localeCompare(b.id)).map((t) => {
       const ratio = Math.round(WYStore.masteryRatio(t.id) * 100);
       const st = WYStore.getTextState(t.id);
       const nudge = (!st.mastered && st.total >= 3) ? masteryNudge(st) : '';
@@ -225,7 +259,7 @@ function renderList() {
       <div class="card text-list-item" data-id="${t.id}" role="button" tabindex="0">
         <div>
           <strong>${t.title}</strong>　${t.author}
-          <div style="font-size:.8rem;color:var(--ink-dan);">${t.era}·${t.genre}</div>
+          <div style="font-size:.8rem;color:var(--ink-dan);">${t.era}·${t.genre}・難度 ${t.difficulty}/5${beginnerIds.has(t.id) ? '・新手先讀' : ''}</div>
         </div>
         <span class="badge-group"><span class="badge-level">${t.level === 'J' ? '國中' : '高中'}</span>${nudge || `<span class="badge-pct">${ratio}%</span>`}</span>
       </div>`;
@@ -239,13 +273,15 @@ function renderList() {
   };
   const sc = document.getElementById('startCard');
   if (sc) {
-    const go = () => { currentTextId = startText.id; currentQuizType = null; setActiveTab('quiz'); renderQuiz(); };
+    const go = () => { currentTextId = startText.id; renderTextDetail(startText); };
     sc.addEventListener('click', go);
     sc.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   }
   bindHomeStatus();
   bindMoodPicker();
   bindDashboardBackup();
+  const sort = document.getElementById('textSort');
+  if (sort) sort.onchange = () => { currentListSort = sort.value; renderList(); };
   app.querySelectorAll('.text-list-item').forEach((el) => {
     const open = () => {
       currentTextId = el.dataset.id;
@@ -255,6 +291,37 @@ function renderList() {
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   });
   loadClassGoal(); // 班級文氣進度條（非同步，若有班級碼）
+}
+
+function renderWeeklyCard() {
+  const key = WYQuiz.isoWeekKey(new Date());
+  const best = WYStore.weeklyResult(key);
+  return `<button class="card weekly-card" data-act="weekly" aria-label="開始 ${key} 週經典賽">
+    <span><b>本週經典賽・${key}</b><small>20 篇 × 四題型，每週固定一卷，可重複挑戰刷高分</small></span>
+    <strong>${best.attempts ? `最高 ${best.best}/${best.total}` : '開始挑戰'}</strong>
+  </button>`;
+}
+
+function startWeeklyQuiz() {
+  currentQuiz = WYQuiz.buildWeeklyQuiz({ date: new Date(), n: 20 });
+  currentQuizType = '__weekly__';
+  weeklyDeadline = Date.now() + 10 * 60 * 1000;
+  if (weeklyTimerId) clearInterval(weeklyTimerId);
+  weeklyTimerId = setInterval(updateWeeklyTimer, 1000);
+  _resetRound();
+  setActiveTab('quiz');
+  drawQuiz();
+}
+
+function updateWeeklyTimer() {
+  if (!currentQuiz || currentQuiz.mode !== 'weekly') return;
+  const left = Math.max(0, Math.ceil((weeklyDeadline - Date.now()) / 1000));
+  const el = document.getElementById('weeklyTimer');
+  if (el) el.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  if (left > 0) return;
+  clearInterval(weeklyTimerId); weeklyTimerId = null;
+  currentQIdx = currentQuiz.questions.length;
+  drawQuiz();
 }
 
 // 「就差 N 題精通」nudge：把最關鍵的「再進這篇」決策點放在選文清單卡上（不只藏在自測內）
@@ -283,7 +350,7 @@ function renderHomeStatus() {
     const target = lastDone && nextT ? nextT : lastT;
     const allDone = lastDone && !nextT;
     cards.push(`<button class="home-status home-continue" data-act="${allDone ? 'caotang' : 'continue'}" data-id="${target.id}">
-      <span class="hs-icon">▶</span><span class="hs-text"><b>${allDone ? '前往解憂草堂' : lastDone ? `挑下一篇《${target.title}》` : `再練《${target.title}》一輪`}</b><small>${allDone ? '27 篇皆已精通，看看完整收藏' : '開一輪新的短關'}</small></span></button>`);
+      <span class="hs-icon">▶</span><span class="hs-text"><b>${allDone ? '前往解憂草堂' : lastDone ? `挑下一篇《${target.title}》` : `再練《${target.title}》一輪`}</b><small>${allDone ? `${TEXTS.length} 篇皆已精通，看看完整收藏` : '開一輪新的短關'}</small></span></button>`);
   }
   const due = WYStore.dueCount();
   if (due > 0) cards.push(`<button class="home-status home-due" data-act="due">
@@ -296,13 +363,14 @@ function renderHomeStatus() {
 }
 
 function bindHomeStatus() {
-  app.querySelectorAll('.home-status').forEach((btn) => {
+  app.querySelectorAll('.home-status, .weekly-card').forEach((btn) => {
     btn.addEventListener('click', () => {
       const act = btn.dataset.act;
       if (act === 'continue') { currentTextId = btn.dataset.id; currentQuizType = null; setActiveTab('quiz'); renderQuiz(); }
       else if (act === 'caotang') { setActiveTab('caotang'); WYCaotang.render(app); }
       else if (act === 'due') startReviewQuiz(WYStore.dueItems().map((x) => x.qId), '今日複習');
       else if (act === 'wrong') startReviewQuiz(WYStore.wrongItems(), '錯題本');
+      else if (act === 'weekly') startWeeklyQuiz();
     });
   });
   const join = document.getElementById('homeClassJoin');
@@ -373,6 +441,34 @@ const SEG_TABS = [
   { key: 'note', label: '賞析' },
 ];
 
+// 全站共用的文言文閱讀四步法（每篇詳情頁都出現，練熟能遷移到沒讀過的古文）。
+const READING_STEPS = [
+  ['斷句定調', '先看標題、作者、文體，猜這篇要說什麼'],
+  ['抓虛詞與句式', '之乎者也、判斷句／倒裝，定準句義'],
+  ['逐段抓主語與動作', '誰做了什麼、時間與空間怎麼移動'],
+  ['收束問主旨', '作者的立場、情感或勸勉是什麼'],
+];
+
+// 「怎麼讀這一篇」策略卡：通用四步法 + 該篇客製切入點（t.readingStrategy）。
+function readingStrategyHtml(t) {
+  const focus = Array.isArray(t.readingStrategy) ? t.readingStrategy : [];
+  return `
+    <details class="card strategy-card">
+      <summary class="strategy-summary">📖 怎麼讀這一篇？<span class="strategy-hint">閱讀理解策略・點開展開</span></summary>
+      <div class="strategy-body">
+        <p class="strategy-sub">通用四步法（每篇都適用，練熟就能帶著走）</p>
+        <ol class="strategy-steps">
+          ${READING_STEPS.map(([h, d]) => `<li><b>${h}</b>：${d}</li>`).join('')}
+        </ol>
+        ${focus.length ? `
+        <p class="strategy-sub">這一篇特別注意</p>
+        <ul class="strategy-focus">
+          ${focus.map((s) => `<li>${s}</li>`).join('')}
+        </ul>` : ''}
+      </div>
+    </details>`;
+}
+
 const TYPE_LABEL = { char: '字義', sentence: '句義', gist: '段旨', theme: '篇章文意' };
 
 // 學習儀表板：逐題型正確率＋精通篇數，讓學生看到弱點、家長/老師看得懂學了什麼（教育專家審查要求）
@@ -380,6 +476,7 @@ function renderDashboard(answeredArg) {
   const stats = WYStore.typeStats();
   const answered = answeredArg != null ? answeredArg : stats.reduce((s, x) => s + x.total, 0);
   const masteredCount = WYStore.allMastered().length;
+  const corrections = WYStore.correctionStats();
   if (answered === 0) return ''; // 還沒作答就不佔版面
   const weakest = stats.filter((x) => x.total >= 3).sort((a, b) => a.ratio - b.ratio)[0];
   const bars = stats.map((x) => {
@@ -397,7 +494,7 @@ function renderDashboard(answeredArg) {
     : (answered >= 8 ? '<p class="dash-advice">👍 各題型都在水準上，繼續保持！</p>' : '');
   return `
     <details class="card dash-card" open>
-      <summary>📊 我的學習儀表板　<small>已精通 ${masteredCount}/27 篇・答題 ${answered} 次</small></summary>
+      <summary>📊 我的學習儀表板　<small>已精通 ${masteredCount}/${TEXTS.length} 篇・答題 ${answered} 次・錯題精通率 ${corrections.seen ? Math.round(corrections.ratio * 100) + '%' : '尚無錯題'}</small></summary>
       <div class="dash-body">
         ${weakLine}
         ${bars}
@@ -437,7 +534,7 @@ function renderTextDetail(t) {
     <div class="card worry-card">
       <p class="worry-label">此篇之憂</p>
       <p class="worry-ancient">${t.worry}</p>
-      ${t.worryEcho ? `<p class="worry-echo">🫧 硯靈低語：我猜此刻的你也……${t.worryEcho}</p>` : ''}
+      ${worryEchoHtml(t)}
     </div>` : '';
   app.innerHTML = `
     <div class="card">
@@ -446,6 +543,7 @@ function renderTextDetail(t) {
       <p style="color:var(--ink-dan)">${t.author}·${t.era}</p>
     </div>
     ${worryHtml}
+    ${readingStrategyHtml(t)}
     ${t.segments.map((seg, i) => `
       <div class="card segment-block">
         <div class="passage segment-original">${seg.text}</div>
@@ -485,6 +583,11 @@ function renderTextDetail(t) {
       });
     });
   });
+}
+
+function worryEchoHtml(t) {
+  if (!t || !t.worryEcho || !currentMoodFilter || !Array.isArray(t.moods) || !t.moods.includes(currentMoodFilter)) return '';
+  return `<p class="worry-echo">🫧 硯靈低語：你帶著「${currentMoodFilter}」來讀這篇，也許正因為……${t.worryEcho}</p>`;
 }
 
 function renderSegTabContent(seg, tabKey) {
@@ -596,6 +699,14 @@ const QUIZ_TYPES = [
 
 const TAG_LIST = ['虛詞', '活用', '古今異義', '通假', '句式'];
 
+const COMPANION_TITLES = ['初醒', '識墨', '聽雨', '讀心', '解憂', '知言', '含章', '照夜', '澄懷', '通微', '硯心'];
+function companionHtml() {
+  const level = WYStore.companionLevel();
+  const artLevel = Math.min(5, level);
+  const title = COMPANION_TITLES[level] || COMPANION_TITLES.at(-1);
+  return `<div class="yanling-companion yanling-lv-${level} ${level >= 6 ? 'yanling-golden' : ''}" aria-label="硯靈等級 ${level}，雅稱 ${title}"><img class="yanling-art" src="assets/companion/yanling-lv${artLevel}.webp" alt="硯靈 Lv.${level} ${title}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🖋️'}))"><small>Lv.${level}・${title}</small></div>`;
+}
+
 function _resetRound() {
   currentQIdx = 0;
   currentQuizCombo = 0;
@@ -606,7 +717,8 @@ function _resetRound() {
 }
 
 function renderQuiz() {
-  if (currentQuizType === '__review__') currentQuizType = null; // 從複習卷退出後回正常自測
+  if (weeklyTimerId) { clearInterval(weeklyTimerId); weeklyTimerId = null; }
+  if (String(currentQuizType || '').startsWith('__')) currentQuizType = null; // 從跨篇卷退出後回正常自測
   if (!currentTextId) currentTextId = START_TEXT_ID;
   currentQuiz = currentQuizType === 'cloze'
     ? WYQuiz.buildClozeQuiz(currentTextId, { n: SHORT_ROUND })
@@ -639,6 +751,7 @@ function quizSettlementHtml() {
   const inkGain = Math.max(0, WYStore.getInk() - currentRoundInkStart);
   const perfect = total > 0 && correct === total;
   const isReview = currentQuiz.mode === 'review';
+  const isWeekly = currentQuiz.mode === 'weekly';
   const tId = currentQuiz.textId;
   const st = tId ? WYStore.getTextState(tId) : null;
   let masteryLine = '';
@@ -654,7 +767,7 @@ function quizSettlementHtml() {
   }
   const due = WYStore.dueCount();
   const btns = [`<button class="primary settle-again" id="settleAgain">🔁 再來一輪</button>`];
-  if (tId && !isReview) btns.push(`<button class="primary settle-battle" id="settleBattle">⚔️ 去對戰作者</button>`);
+  if (tId && !isReview && !isWeekly) btns.push(`<button class="primary settle-battle" id="settleBattle">⚔️ 去對戰作者</button>`);
   if (due > 0) btns.push(`<button class="primary settle-review" id="settleReview">📖 複習到期 ${due} 題</button>`);
   btns.push(`<button class="link-back" id="settleHome">回選文</button>`);
   const milestone = WYStore.peekStreakMilestone();
@@ -684,9 +797,15 @@ function bindSettlement() {
     const finalText = el.textContent; el.dataset.final = finalText; el.classList.add('count-up');
   });
   if (WYStore.peekStreakMilestone()) WYStore.consumeStreakMilestone();
+  if (currentQuiz.mode === 'weekly' && !currentQuiz._resultSaved) {
+    if (weeklyTimerId) { clearInterval(weeklyTimerId); weeklyTimerId = null; }
+    WYStore.recordWeeklyResult(currentQuiz.weekKey, currentQuizRound.correct, currentQuizRound.total);
+    currentQuiz._resultSaved = true;
+  }
   const again = document.getElementById('settleAgain');
   if (again) again.onclick = () => {
     if (currentQuiz.mode === 'review') { setActiveTab('list'); renderList(); return; }
+    if (currentQuiz.mode === 'weekly') { startWeeklyQuiz(); return; }
     renderQuiz();
   };
   const battle = document.getElementById('settleBattle');
@@ -701,9 +820,12 @@ function drawQuiz() {
   const noteHtml = pendingQuizNote ? `<div class="card quiz-note">💡 ${pendingQuizNote}</div>` : '';
   pendingQuizNote = null; // 只提示一次
   const isReview = currentQuiz.mode === 'review';
+  const isWeekly = currentQuiz.mode === 'weekly';
   // 複習模式：只顯示標題＋離開，不顯示題型/標籤切換（跨篇混合）
   const headerHtml = isReview
     ? noteHtml + `<div class="card"><p class="quiz-focus">📖 ${currentQuiz.title}（跨篇複習）　<button class="link-back" id="quizPickOther">結束複習</button></p></div>`
+    : isWeekly
+      ? noteHtml + `<div class="card"><p class="quiz-focus">🏮 ${currentQuiz.title}（20 篇跨篇限時卷）　倒數 <strong id="weeklyTimer">10:00</strong>　<button class="link-back" id="quizPickOther">離開週賽</button></p><p class="weekly-note">同一週題目固定；成績只計真實答對，可重複挑戰最高分。</p></div>`
     : noteHtml + `
     <div class="card">
       <p class="quiz-focus">📖 自測：《${currentQuiz.title}》　<button class="link-back" id="quizPickOther">換一篇</button></p>
@@ -717,7 +839,7 @@ function drawQuiz() {
   if (!q) {
     if (currentQuiz.mode === 'cloze' && currentQuiz.questions.length === 0) {
       app.innerHTML = headerHtml + '<div class="card"><h3>此篇暫無填空題</h3><p>換一篇，或改練其他題型。</p></div>';
-    } else if (currentQuizRound.total === 0) {
+    } else if (currentQuizRound.total === 0 && currentQuiz.questions.length === 0) {
       app.innerHTML = headerHtml + '<div class="card"><h3>此範圍暫無題目</h3><p>換一篇或換題型／標籤。</p></div>';
     } else {
       app.innerHTML = headerHtml + quizSettlementHtml();
@@ -765,17 +887,32 @@ function drawQuiz() {
     input.focus();
     return;
   }
+  const hintTickets = WYStore.getHintTickets();
+  const hintBeforeHtml = hintTickets > 0
+    ? `<button class="primary" id="useHintBefore">使用提示券（剩 ${hintTickets}）排除一個誘答</button>`
+    : '';
   quizStage.innerHTML = `
     <div class="card quiz-question-card">
-      <div class="yanling-companion yanling-lv-${Math.min(5, WYStore.companionLevel())}" aria-label="硯靈等級 ${WYStore.companionLevel()}"><span>🖋️</span><small>Lv.${WYStore.companionLevel()}</small></div>
+      ${companionHtml()}
       <span class="badge">${WYQuiz.typeLabel(q.type)}　${posBadge}</span>
       <p style="font-size:1.05rem;margin-top:10px;">${q.stem}</p>
+      ${hintBeforeHtml}
       <div class="options">
-        ${q.options.map((opt, i) => `<button data-i="${i}">${opt}</button>`).join('')}
+        ${q.options.map((opt, i) => `<button data-i="${i}" aria-label="選項 ${i + 1}：${opt}" aria-pressed="false" aria-describedby="feedback">${opt}</button>`).join('')}
       </div>
       <div id="feedback" role="status" aria-live="polite" tabindex="-1"></div>
     </div>`;
   bindQuizTypeTabs();
+  const useHintBefore = document.getElementById('useHintBefore');
+  if (useHintBefore) useHintBefore.onclick = () => {
+    if (!WYStore.useHintTicket()) return;
+    const wrongIdx = WYQuiz.hintWrongIndex(q);
+    const wrong = app.querySelector(`.options button[data-i="${wrongIdx}"]`);
+    if (wrong) wrong.hidden = true;
+    useHintBefore.textContent = '已排除一個誘答';
+    useHintBefore.disabled = true;
+    updateInkHud();
+  };
   app.querySelectorAll('.options button').forEach((btn) => {
     btn.addEventListener('click', () => {
       const i = Number(btn.dataset.i);
@@ -783,6 +920,7 @@ function drawQuiz() {
       const clicked = app.querySelectorAll('.options button')[i];
       app.querySelectorAll('.options button').forEach((b, bi) => {
         b.disabled = true;
+        b.setAttribute('aria-pressed', bi === q.answerIdx ? 'true' : 'false');
         if (bi === q.answerIdx) b.classList.add('correct');
         else if (bi === i) b.classList.add('wrong');
       });
@@ -803,7 +941,7 @@ function ensureQuizShell(headerHtml, sourceHtml, key) {
   return document.getElementById('quizStage');
 }
 
-// 答對→自動延遲進下一題（保留看解析的節奏）；答錯→保留手動「下一題」（本來就該停下讀懂）
+// 無論答對或答錯，都保留解析並由學生手動進下一題。
 function revealFeedback(isCorrect, inkGain, q, wrongLead) {
   const capNote = (isCorrect && inkGain === 0) ? '<span class="ink-cap-note">🌿 今日墨錠已滿——接下來每一題，純粹是你想讀懂它。</span>' : '';
   const fb = document.getElementById('feedback');
@@ -814,9 +952,6 @@ function revealFeedback(isCorrect, inkGain, q, wrongLead) {
   const advance = () => { currentQIdx += 1; drawQuiz(); };
   document.getElementById('nextQ').onclick = advance;
   fb.focus();
-  const last = currentQIdx >= currentQuiz.questions.length - 1;
-  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (isCorrect && !last && !reduceMotion) setTimeout(() => { if (document.getElementById('nextQ')) advance(); }, 1400);
 }
 
 // 自我解釋錯因（⑨記憶科學）：答錯先讓學生說「為什麼會選錯」，再揭示解析
@@ -825,23 +960,15 @@ function askSelfExplain(q, inkGain) {
   const fb = document.getElementById('feedback');
   if (!fb) return;
   const rescue = WYStore.recentAccuracy().streakWrong >= 2 ? '<p class="rescue-hint">先打開上方「對照原文」找線索；慢一點沒關係。</p>' : '';
-  const hint = WYStore.getHintTickets() > 0 ? `<button class="primary" id="useHint">使用提示券（剩 ${WYStore.getHintTickets()}）排除一個誘答</button>` : '';
   fb.innerHTML = `
     <div class="self-explain">
       <p class="se-q">❌ 先想一下：你為什麼會選錯？</p>
-      ${rescue}${hint}
+      ${rescue}
       <div class="se-opts">${WRONG_REASONS.map((r, i) => `<button class="se-btn" data-i="${i}">${r}</button>`).join('')}</div>
     </div>`;
   fb.querySelectorAll('.se-btn').forEach((b) => {
     b.addEventListener('click', () => revealFeedback(false, inkGain, q, '正解：'));
   });
-  const use = document.getElementById('useHint');
-  if (use) use.onclick = () => {
-    if (!WYStore.useHintTicket()) return;
-    const wrong = [...app.querySelectorAll('.options button')].filter((b) => Number(b.dataset.i) !== q.answerIdx);
-    if (wrong.length) wrong[wrong.length - 1].hidden = true;
-    use.textContent = '已排除一個誘答'; use.disabled = true; updateInkHud();
-  };
   fb.focus();
 }
 
@@ -894,7 +1021,8 @@ function showMasteryReveal(t, gearId) {
   WYSound.drop(2);
   const box = document.createElement('div');
   box.className = 'drop-reveal mastery-reveal';
-  box.innerHTML = `<div class="drop-inner"><p class="drop-got">解憂結算</p><h3>你聽懂了 ${t.author} 的憂</h3><p>${t.worry}</p><p>🫧 硯靈低語：${t.worryEcho || '你已讀懂他了。'}</p>${gearId ? '<small>另獲得一件文房收藏</small>' : ''}</div>`;
+  const echo = worryEchoHtml(t) || '<p>🫧 硯靈低語：你已讀懂他了。</p>';
+  box.innerHTML = `<div class="drop-inner"><p class="drop-got">解憂結算</p><h3>你聽懂了 ${t.author} 的憂</h3><p>${t.worry}</p>${echo}${gearId ? '<small>另獲得一件文房收藏</small>' : ''}</div>`;
   app.appendChild(box);
   setTimeout(() => box.remove(), 3200);
 }
@@ -1091,6 +1219,12 @@ function drawBattle() {
   document.getElementById('battleStage').querySelectorAll('.options button').forEach((btn) => {
     btn.addEventListener('click', () => {
       const isCorrect = Number(btn.dataset.i) === q.answerIdx;
+      document.getElementById('battleStage').querySelectorAll('.options button').forEach((option) => {
+        const optionIdx = Number(option.dataset.i);
+        option.disabled = true;
+        if (optionIdx === q.answerIdx) option.classList.add('correct');
+        else if (option === btn) option.classList.add('wrong');
+      });
       // 對戰不計精通（防重複刷同批題灌分）；精通只能靠「自測」達成。仍賺墨錠。
       WYStore.recordAnswer(currentTextId, isCorrect, q.type, { countForMastery: false });
       const beforeOpponentHp = currentBattle.opponent.curHp;
@@ -1122,9 +1256,15 @@ function drawBattle() {
       const dmg = isCorrect ? beforeOpponentHp - currentBattle.opponent.curHp : beforePlayerHp - currentBattle.player.curHp;
       isCorrect ? WYSound.correct() : WYSound.wrong();
       if (currentBattle.comboMilestone) WYSound.combo();
-      currentQIdx += 1;
-      drawBattle();
-      showBattleFeedback(isCorrect, dmg, currentBattle.comboMilestone, currentBattle.combo);
+      const battleShell = document.getElementById('battleShell');
+      const nextEnemyFill = battleShell.querySelector('.hp-fill.enemy');
+      const nextPlayerFill = battleShell.querySelector('.hp-fill.player');
+      requestAnimationFrame(() => {
+        nextEnemyFill.style.width = `${currentBattle.opponent.curHp}%`;
+        nextPlayerFill.style.width = `${currentBattle.player.curHp}%`;
+        nextPlayerFill.classList.toggle('low', currentBattle.player.curHp <= 30);
+      });
+      showBattleFeedback(isCorrect, dmg, currentBattle.comboMilestone, currentBattle.combo, q);
     });
   });
 }
@@ -1141,14 +1281,15 @@ function canDropBattleToday(opponentId) {
   } catch { return false; }
 }
 
-function showBattleFeedback(isCorrect, dmg, comboMilestone, combo) {
+function showBattleFeedback(isCorrect, dmg, comboMilestone, combo, q) {
   const target = app.querySelector('.battle-portrait');
-  if (!target) return;
-  const float = document.createElement('span');
-  float.className = `dmg-float ${isCorrect ? 'dmg-hit' : 'dmg-hurt'}`;
-  float.textContent = `-${dmg}`;
-  target.parentElement.appendChild(float);
-  setTimeout(() => float.remove(), 900);
+  if (target) {
+    const float = document.createElement('span');
+    float.className = `dmg-float ${isCorrect ? 'dmg-hit' : 'dmg-hurt'}`;
+    float.textContent = `-${dmg}`;
+    target.parentElement.appendChild(float);
+    setTimeout(() => float.remove(), 900);
+  }
   const card = app.querySelector('.battle-card');
   if (card) {
     card.classList.add('shake');
@@ -1161,6 +1302,22 @@ function showBattleFeedback(isCorrect, dmg, comboMilestone, combo) {
     app.appendChild(banner);
     setTimeout(() => banner.remove(), 900);
   }
+  const stage = document.getElementById('battleStage');
+  if (!stage) return;
+  const feedback = document.createElement('div');
+  feedback.className = 'battle-answer-feedback';
+  feedback.setAttribute('role', 'status');
+  feedback.setAttribute('tabindex', '-1');
+  feedback.innerHTML = `
+    <p>${isCorrect ? '✅ 答對了！' : '❌ 再看一次。'}正解：${q.options[q.answerIdx]}</p>
+    <p>${q.explain}</p>
+    <button class="primary" id="battleContinue">${currentBattle.finished ? '查看對戰結果' : '繼續下一題'}</button>`;
+  stage.appendChild(feedback);
+  document.getElementById('battleContinue').onclick = () => {
+    currentQIdx += 1;
+    drawBattle();
+  };
+  feedback.focus();
 }
 
 function renderWenhao() {

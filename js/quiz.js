@@ -35,20 +35,34 @@ const WYQuiz = (() => {
   //   type：篩單一題型（char/sentence/gist/theme）；null＝混合。
   //   tag ：篩能力標籤（虛詞/活用/古今異義/通假/句式）——供「專練某能力」，不生成新題只篩既有題。
   //   n   ：短關題數上限（null＝全部；自測短關傳 8，對戰不傳＝整池循環）。
-  //   ramp：true 時只把一題最易題放在開頭，其餘維持交錯順序。
+  //   ramp：true 時把三題由易到難的暖身題放在開頭，其餘維持洗牌順序。
   function buildQuiz(textId, { type = null, tag = null, seed = Date.now(), n = null, ramp = false } = {}) {
     const t = texts.find((x) => x.id === textId);
     if (!t) return { title: '', questions: [] };
     let pool = t.questions.slice();
     if (type) pool = pool.filter((q) => q.type === type);
     if (tag) pool = pool.filter((q) => Array.isArray(q.tags) && q.tags.includes(tag));
-    let qs = seededShuffle(pool, seed);
-    if (n && n > 0) qs = qs.slice(0, n);
+    let qs;
+    if (!type && !tag && Number(n) === 8) {
+      const selected = [];
+      for (const [quizType, rank] of Object.entries(TYPE_ORDER)) {
+        selected.push(...seededShuffle(pool.filter((q) => q.type === quizType), seed + rank + 1).slice(0, 2));
+      }
+      const picked = new Set(selected);
+      const fallback = seededShuffle(pool.filter((q) => !picked.has(q)), seed + 97);
+      qs = seededShuffle(selected.concat(fallback.slice(0, Math.max(0, 8 - selected.length))), seed).slice(0, 8);
+    } else {
+      qs = seededShuffle(pool, seed);
+      if (n && n > 0) qs = qs.slice(0, n);
+    }
     if (ramp && qs.length > 1) {
-      let easiest = 0;
-      for (let i = 1; i < qs.length; i++) if ((TYPE_ORDER[qs[i].type] ?? 9) < (TYPE_ORDER[qs[easiest].type] ?? 9)) easiest = i;
-      const [warmup] = qs.splice(easiest, 1);
-      qs.unshift(warmup);
+      const warmCount = Math.min(3, qs.length);
+      const ranked = qs.map((q, i) => ({ q, i, rank: TYPE_ORDER[q.type] ?? 9 }))
+        .sort((a, b) => a.rank - b.rank || a.i - b.i)
+        .slice(0, warmCount);
+      const picked = new Set(ranked.map((x) => x.q.id));
+      const warmup = ranked.map((x) => x.q);
+      qs = warmup.concat(qs.filter((q) => !picked.has(q.id)));
     }
     qs = qs.map((q) => {
       const optOrder = seededShuffle([0, 1, 2, 3], optSeed(q.id, seed));
@@ -63,6 +77,51 @@ const WYQuiz = (() => {
       };
     });
     return { title: t.title, textId, questions: qs };
+  }
+
+  function isoWeekKey(input = new Date()) {
+    const d = new Date(input);
+    if (Number.isNaN(d.getTime())) return '';
+    const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const day = utc.getUTCDay() || 7;
+    utc.setUTCDate(utc.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
+    return `${utc.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  }
+
+  function seedFromKey(key) {
+    let h = 2166136261;
+    for (const ch of String(key)) {
+      h ^= ch.charCodeAt(0);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  // 週經典賽：每週固定從 20 篇各取一題，四題型各 5 題；完全重用既有題庫。
+  function buildWeeklyQuiz({ date = new Date(), weekKey = null, n = 20 } = {}) {
+    const key = weekKey || isoWeekKey(date);
+    const seed = seedFromKey(key);
+    const count = Math.max(1, Math.min(20, Number(n) || 20, texts.length));
+    const textOrder = seededShuffle(texts.slice().sort((a, b) => a.id.localeCompare(b.id)), seed);
+    const selected = [];
+    const types = Object.keys(TYPE_ORDER);
+    for (let i = 0; i < textOrder.length && selected.length < count; i++) {
+      const t = textOrder[i];
+      const preferred = types[selected.length % types.length];
+      const sameType = (t.questions || []).filter((q) => q.type === preferred);
+      const pool = sameType.length ? sameType : (t.questions || []);
+      if (!pool.length) continue;
+      const raw = seededShuffle(pool, optSeed(t.id, seed))[0];
+      const optOrder = seededShuffle([0, 1, 2, 3], optSeed(raw.id, seed));
+      selected.push({
+        id: raw.id, textId: t.id, textTitle: t.title, stem: raw.stem,
+        options: optOrder.map((k) => raw.options[k]), answerIdx: optOrder.indexOf(raw.answer),
+        explain: raw.explain, type: raw.type, tags: raw.tags || [],
+      });
+    }
+    return { title: `週經典賽 ${key}`, weekKey: key, textId: null, questions: selected, mode: 'weekly' };
   }
 
   // 某篇含指定能力標籤的題數（供 UI 判斷要不要顯示該專練入口）
@@ -167,11 +226,17 @@ const WYQuiz = (() => {
     return a.length > 0 && (q.accept || [q.answerText]).some((x) => normText(x) === a);
   }
 
+  function hintWrongIndex(q, excluded = []) {
+    if (!q || !Array.isArray(q.options)) return -1;
+    const hidden = new Set(excluded);
+    return q.options.findIndex((_, i) => i !== q.answerIdx && !hidden.has(i));
+  }
+
   function typeLabel(type) {
     return { char: '字義', sentence: '句義', gist: '段旨', theme: '篇章文意', cloze: '填空' }[type] || type;
   }
 
-  return { init, buildQuiz, buildClozeQuiz, buildReviewQuiz, tagCount, checkCloze, normText, typeLabel, seededShuffle };
+  return { init, buildQuiz, buildWeeklyQuiz, buildClozeQuiz, buildReviewQuiz, isoWeekKey, seedFromKey, tagCount, checkCloze, hintWrongIndex, normText, typeLabel, seededShuffle };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = WYQuiz;

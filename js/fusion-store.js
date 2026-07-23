@@ -144,7 +144,7 @@ const WYFusionStore = (() => {
     return { textId, title, author, ratio, total, ok };
   }
 
-  // 資格判定：兩篇皆精通（答對率≥0.8 且 total≥8）且各累積作答量≥30，且墨錠足夠合契費。
+  // 資格判定：兩篇皆符合核心精通門檻，且各累積作答量≥30，並有足夠合契費。
   function getEligibility(fusion, wenpoId, deps) {
     fusion = ensure(fusion);
     const w = WENPO_BY_ID.get(wenpoId);

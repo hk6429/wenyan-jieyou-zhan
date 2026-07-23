@@ -58,7 +58,7 @@
 
     const decors = v.decorations.map((d) => `
       <div class="ct-decor ct-decor--${d.kind}" data-decor="${d.id}" style="left:${d.x}%;top:${d.y}%"
-           role="button" tabindex="0" aria-label="${esc(d.name)}（可拖曳擺放）">
+           role="button" tabindex="0" aria-pressed="false" aria-label="${esc(d.name)}（可拖曳；按 Enter 或空白後用方向鍵擺放）">
         <img src="${IMG_DIR}/decor-${d.kind}.webp" alt="" draggable="false" loading="lazy" ${fb(d.emoji)}>
       </div>`).join('');
 
@@ -90,7 +90,7 @@
             <span class="ct-scroll-title">${esc(s.title)}</span>
             <span class="ct-scroll-author">${esc(s.author)}</span>
           </div>`).join('')
-      : '<p class="ct-empty">尚無掛軸——把任一篇選文練到精通（答滿 8 題、答對率 80%），藏書閣就會多一幅掛軸。</p>';
+      : '<p class="ct-empty">尚無掛軸——把任一篇選文練到精通（至少 10 題、總答對率 80%，四題型各達門檻），藏書閣就會多一幅掛軸。</p>';
     return `<div class="card"><h3>精通掛軸・藏書閣（${v.scrolls.length}）</h3><div class="ct-scroll-wall">${body}</div></div>`;
   }
 
@@ -174,6 +174,25 @@
     const scene = mountEl.querySelector('#ct-scene');
     if (!scene) return;
     mountEl.querySelectorAll('.ct-decor').forEach((el) => {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const on = el.getAttribute('aria-pressed') !== 'true';
+          el.setAttribute('aria-pressed', on ? 'true' : 'false');
+          el.classList.toggle('is-keyboard-moving', on);
+          return;
+        }
+        if (el.getAttribute('aria-pressed') !== 'true' || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        e.preventDefault();
+        const dx = e.key === 'ArrowLeft' ? -3 : e.key === 'ArrowRight' ? 3 : 0;
+        const dy = e.key === 'ArrowUp' ? -3 : e.key === 'ArrowDown' ? 3 : 0;
+        const x = Number.parseFloat(el.style.left) + dx;
+        const y = Number.parseFloat(el.style.top) + dy;
+        CT.placeDecoration(state, el.dataset.decor, x, y);
+        const pos = state.placements[el.dataset.decor];
+        el.style.left = pos.x + '%'; el.style.top = pos.y + '%';
+        persist();
+      });
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const rect = scene.getBoundingClientRect();

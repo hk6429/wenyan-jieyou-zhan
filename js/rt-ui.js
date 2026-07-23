@@ -74,7 +74,7 @@ const WYRt = (() => {
     if (!scope) return '';
     if (scope.mode === 'single') { const t = TEXTS.find((x) => x.id === scope.textId); return `單篇・${t ? t.title : scope.textId}`; }
     if (scope.mode === 'level') return scope.level === 'J' ? '難度・國中' : '難度・高中';
-    return '混合・全 27 篇';
+    return `混合・全 ${TEXTS.length} 篇`;
   }
 
   // ---------- 進場：主選單 ----------
@@ -82,6 +82,20 @@ const WYRt = (() => {
     root = mountEl;
     clearTimers();
     home();
+    return root;
+  }
+
+  function openTeacher(mountEl) {
+    root = mountEl || (typeof document !== 'undefined' ? document.getElementById('app') : null);
+    if (!root) return null;
+    if (typeof document !== 'undefined') {
+      document.querySelectorAll('nav.tabs button').forEach((button) => {
+        button.classList.remove('active');
+        button.removeAttribute('aria-current');
+      });
+    }
+    clearTimers();
+    liveHostScreen();
     return root;
   }
 
@@ -130,11 +144,13 @@ const WYRt = (() => {
   // ---------- 開房 ----------
   function scopePicker(id) {
     const opts = TEXTS.map((t) => `<option value="${t.id}">${esc(t.title)}（${t.level === 'J' ? '國中' : '高中'}）</option>`).join('');
+    const juniorN = TEXTS.filter((t) => t.level === 'J').length;
+    const seniorN = TEXTS.filter((t) => t.level === 'S').length;
     return `
       <div class="rt-scope" id="${id}">
-        <label><input type="radio" name="rtmode" value="mixed" checked> 混合・全 27 篇</label>
-        <label><input type="radio" name="rtmode" value="level-J"> 難度・國中 11 篇</label>
-        <label><input type="radio" name="rtmode" value="level-S"> 難度・高中 16 篇</label>
+        <label><input type="radio" name="rtmode" value="mixed" checked> 混合・全 ${TEXTS.length} 篇</label>
+        <label><input type="radio" name="rtmode" value="level-J"> 難度・國中 ${juniorN} 篇</label>
+        <label><input type="radio" name="rtmode" value="level-S"> 難度・高中 ${seniorN} 篇</label>
         <label><input type="radio" name="rtmode" value="single"> 單篇：</label>
         <select class="rt-single">${opts}</select>
       </div>`;
@@ -265,6 +281,7 @@ const WYRt = (() => {
         </div>
         <div class="rt-vs">第 ${Math.min(B.idx + 1, B.qs.length)}/${B.qs.length} 題</div>
         <div class="rt-side rt-opp">
+          ${B.bot && B.oppSnap && B.oppSnap.art != null ? `<img class="rt-opp-art" src="${yanlingArt(B.oppSnap.art)}" alt="" ${yanlingFb}>` : ''}
           <div class="rt-name">${oppName}</div>
           <div class="rt-hpbar rt-hpbar--opp"><span style="width:${op}%"></span></div>
           <div class="rt-hpn">${oppHp()}</div>
@@ -422,11 +439,14 @@ const WYRt = (() => {
   }
 
   // ---------- 與硯靈對練（單機 bot，不必等同學）----------
+  // art = 對應的硯靈進化階立繪（複用養成夥伴圖：難度越高，硯靈化身越成形）
   const BOT_LEVELS = [
-    { key: 'easy', label: '蒙學（易）', target: 180 },
-    { key: 'mid', label: '秀才（中）', target: 300 },
-    { key: 'hard', label: '進士（難）', target: 420 },
+    { key: 'easy', label: '蒙學（易）', target: 180, art: 1 },
+    { key: 'mid', label: '秀才（中）', target: 300, art: 3 },
+    { key: 'hard', label: '進士（難）', target: 420, art: 5 },
   ];
+  const yanlingArt = (lv) => `assets/companion/yanling-lv${lv}.webp`;
+  const yanlingFb = `onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🖋️',className:'rt-yl-emoji'}))"`;
   function botScreen() {
     clearTimers();
     shell(`
@@ -434,6 +454,10 @@ const WYRt = (() => {
       <div class="card">
         <h3>🖋️ 與硯靈對練</h3>
         <p class="rt-sub">硯靈化身對手陪你練功——一個人就能打，比輸出高下。答對照樣賺墨錠；此模式不計入科舉功名（避免刷分）。</p>
+        <div class="rt-bot-face">
+          <img id="rt-bot-art" class="rt-bot-art" src="${yanlingArt(BOT_LEVELS[1].art)}" alt="硯靈化身對手" ${yanlingFb}>
+          <small>難度越高，硯靈化身越成形</small>
+        </div>
         <div class="rt-scope-line">對手強度：
           <select id="rt-bot-lv">${BOT_LEVELS.map((l, i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${l.label}</option>`).join('')}</select>
         </div>
@@ -442,8 +466,14 @@ const WYRt = (() => {
       </div>
     `);
     bindBack();
+    const lvSel = root.querySelector('#rt-bot-lv');
+    const artImg = root.querySelector('#rt-bot-art');
+    lvSel.addEventListener('change', () => {
+      const lv = BOT_LEVELS[Number(lvSel.value)] || BOT_LEVELS[1];
+      if (artImg) artImg.src = yanlingArt(lv.art);
+    });
     root.querySelector('#rt-do-bot').addEventListener('click', () => {
-      const lv = BOT_LEVELS[Number(root.querySelector('#rt-bot-lv').value)] || BOT_LEVELS[1];
+      const lv = BOT_LEVELS[Number(lvSel.value)] || BOT_LEVELS[1];
       startBotRun(readScope(), lv);
     });
   }
@@ -456,7 +486,7 @@ const WYRt = (() => {
     const qs = L().buildRounds(TEXTS, scope, seed, L().ROUNDS);
     B = {
       room: { code: '', seed, scope, nick: getNick() || '練功生', role: 'solo', challenge: { chScore: target, challenger: `硯靈・${lv.label}` } },
-      oppSnap: { nick: `硯靈・${lv.label}`, hp: L().MAX_HP },
+      oppSnap: { nick: `硯靈・${lv.label}`, hp: L().MAX_HP, art: lv.art },
       qs, idx: 0, local: L().newLocalState(100000),
       dmg: 0, correct: 0, done: false, finished: false,
       oppDmg: 0, oppDone: true, oppHb: Date.now(),
@@ -649,18 +679,11 @@ const WYRt = (() => {
   }
 
   async function liveStudentEnd(st) {
-    const r = await api('/api/rt-live', { op: 'roster', code: st.code });
-    const rows = (r && r.ok) ? r.list : [];
-    const board = WALL().safeBoard(rows, st.nick);
-    const meLine = board.me ? `你是第 ${board.me.rank} 名・答對 ${board.me.score} 題` : `你在前五名內・答對 ${st.score} 題`;
     shell(`
       <div class="card rt-result">
         <h2>📡 文會結束</h2>
-        <div class="rt-board">
-          ${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}
-        </div>
-        <div class="rt-title-badge">${meLine}</div>
-        <p class="rt-sub">跟上一場的自己比就是進步。</p>
+        <div class="rt-title-badge">本場答對 ${st.score} 題</div>
+        <p class="rt-sub">為保護同學隱私，完整名單與本場講評僅提供持主持碼的教師查看。跟上一場的自己比就是進步。</p>
         <div class="rt-result-btns"><button class="rt-btn rt-btn--main" data-back>返回擂台</button></div>
       </div>
     `);
@@ -676,6 +699,7 @@ const WYRt = (() => {
       ${backBar()}
       <div class="card">
         <h3>🧑‍🏫 主持全班文會</h3>
+        <p class="rt-privacy">請使用班級碼與匿名暱稱，請勿使用學生真實姓名。主持碼只供教師本人保管。</p>
         <input class="rt-input" id="rt-h-code" maxlength="8" placeholder="班級碼（例：5A03）" value="${esc(cls)}">
         <input class="rt-input" id="rt-h-pin" inputmode="numeric" maxlength="8" placeholder="主持碼（4-8 位數，只你知道）">
         <div class="rt-scope-line">題數：
@@ -714,6 +738,36 @@ const WYRt = (() => {
     });
   }
 
+  function downloadTeacherReview(code, review) {
+    const blob = new Blob([WALL().teacherReviewCsv(review)], { type: 'text/csv;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = `文言解憂站_${code}_本場講評.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(href);
+  }
+
+  function printTeacherReview(code, review) {
+    const printWindow = window.open('', '_blank', 'width=960,height=720');
+    if (!printWindow) return false;
+    printWindow.document.open();
+    printWindow.document.write(WALL().teacherReviewPrintHtml({ code, review }));
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    return true;
+  }
+
+  function teacherReviewTable(review) {
+    return `<div class="rt-review-table-wrap"><table class="rt-review-table">
+      <thead><tr><th>題號</th><th>題幹</th><th>正解</th><th>有效作答N</th><th>缺答N</th><th>正確率</th><th>需講評</th></tr></thead>
+      <tbody>${review.map((row) => `<tr class="${row.needsReview ? 'needs-review' : ''}"><td>${row.qNo}</td><td>${esc(row.stem)}</td><td>${esc(row.answer)}</td><td>${row.answered}</td><td>${row.missing}</td><td>${row.pct == null ? '—' : `${row.pct}%`}</td><td>${row.needsReview ? '是' : '否'}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
   function liveHostPanel(h) {
     clearTimers();
     const draw = (phase, qNo, count) => {
@@ -743,7 +797,7 @@ const WYRt = (() => {
       if (gone()) return clearTimers();
       const [stR, roR] = await Promise.all([
         api('/api/rt-live', { op: 'state', code: h.code }),
-        api('/api/rt-live', { op: 'roster', code: h.code }),
+        api('/api/rt-live', { op: 'roster', code: h.code, pin: h.pin }),
       ]);
       const live = stR && stR.ok ? stR.live : null;
       const rows = roR && roR.ok ? roR.list : [];
@@ -758,6 +812,7 @@ const WYRt = (() => {
         const hot = WALL().questionHotspots(rows, h.qn);
         const coldN = hot.filter((x) => x.cold).length;
         const questions = h.qs || L().buildRounds(TEXTS, h.scope, h.seed, h.qn);
+        const review = WALL().buildTeacherReview({ rows, questions });
         const hotHtml = rows.length ? `
           <div class="rt-hotspots">
             <p class="rt-hot-title">📊 逐題正確率　<small>${coldN ? `${coldN} 題全班卡關（紅），建議課堂講評` : '全班表現平穩'}</small></p>
@@ -768,7 +823,26 @@ const WYRt = (() => {
         if (el) el.innerHTML = `
           <div class="rt-herald">${herald.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
           <div class="rt-board">${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}</div>
-          ${hotHtml}`;
+          ${hotHtml}
+          <section class="rt-review" aria-labelledby="rt-review-title">
+            <h4 id="rt-review-title">本場講評</h4>
+            <p class="rt-privacy">匿名統計，不含學生姓名；下載與列印資料僅供教學講評使用。</p>
+            <div class="rt-review-actions">
+              <button class="rt-btn" id="rt-review-csv">下載 CSV</button>
+              <button class="rt-btn" id="rt-review-print">列印版</button>
+            </div>
+            ${teacherReviewTable(review)}
+            <p class="rt-err" id="rt-review-msg" role="status"></p>
+          </section>`;
+        const csvButton = root.querySelector('#rt-review-csv');
+        if (csvButton) csvButton.addEventListener('click', () => downloadTeacherReview(h.code, review));
+        const printButton = root.querySelector('#rt-review-print');
+        if (printButton) printButton.addEventListener('click', () => {
+          if (!printTeacherReview(h.code, review)) {
+            const message = root.querySelector('#rt-review-msg');
+            if (message) message.textContent = '瀏覽器已阻擋列印視窗，請允許彈出式視窗後重試。';
+          }
+        });
       } else {
         draw(live.phase, live.qNo, answered);
       }
@@ -821,6 +895,10 @@ const WYRt = (() => {
     bindBack();
   }
 
-  return { init, render };
+  return { init, render, openTeacher };
 })();
-if (typeof window !== 'undefined') window.WYRt = WYRt;
+if (typeof globalThis !== 'undefined') globalThis.WYRt = WYRt;
+if (typeof document !== 'undefined') {
+  const teacherLaunch = document.getElementById('teacher-launch');
+  if (teacherLaunch) teacherLaunch.addEventListener('click', () => WYRt.openTeacher(document.getElementById('app')));
+}

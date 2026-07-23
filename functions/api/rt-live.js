@@ -3,10 +3,10 @@
 //
 // POST /api/rt-live：
 //   { op:'start', code, pin, qn, scope }   → { ok:1, live }（重複進行中場次擋下）
-//   { op:'state', code }                    → { ok:1, live:{seed,qn,scope,phase,qNo}|null }（不含 pin）
+//   { op:'state', code }                    → { ok:1, live:{seed,qn,scope,phase,qNo}|null }（不含 pin/answerKey）
 //   { op:'next', code, pin } / { op:'end', code, pin } → { ok:1, live } | { ok:0, error }
 //   { op:'answer', code, nick, qNo, correct } → { ok:1 }
-//   { op:'roster', code }                   → { ok:1, list:[{nick,score,qNo,hist}] }（score 降冪）
+//   { op:'roster', code, pin }              → { ok:1, list:[{nick,score,qNo,hist}] }（主持限定）
 import { kvFor } from './_kv.js';
 
 const TTL = 7200; // 2 小時
@@ -57,6 +57,19 @@ const CORS = (request) => {
 };
 const reply = (request, obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: CORS(request) });
 const parse = (raw) => (raw == null ? null : (typeof raw === 'string' ? JSON.parse(raw) : raw));
+const publicLive = (live) => live ? ({
+  seed: live.seed,
+  qn: live.qn,
+  scope: live.scope,
+  phase: live.phase,
+  qNo: live.qNo,
+}) : null;
+const normalizeHist = (hist) => {
+  if (hist && typeof hist === 'object' && !Array.isArray(hist)) return { ...hist };
+  const out = {};
+  for (const [i, value] of [...String(hist || '')].entries()) out[i + 1] = value === '1' ? 1 : 0;
+  return out;
+};
 
 async function rateLimited(kv, request, scope, cap = 30) {
   const ip = String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
@@ -85,8 +98,7 @@ export async function onRequestPost({ request, env }) {
       const live = { seed: Math.floor(Math.random() * 1e9), qn: clamp(qn, 30) || 10, scope, phase: 'lobby', qNo: 0, pin, answerKey: [] };
       await kv.set(liveKey(code), JSON.stringify(live), { ex: TTL });
       await kv.del(rosterKey(code));
-      const { pin: _p, ...pub } = live;
-      return reply(request, { ok: 1, live: pub });
+      return reply(request, { ok: 1, live: publicLive(live) });
     }
 
     if (op === 'key') {
@@ -103,8 +115,7 @@ export async function onRequestPost({ request, env }) {
       if (!okCode(code)) return reply(request, { ok: 0, error: 'bad req' }, 400);
       const live = parse(await kv.get(liveKey(code)));
       if (!live) return reply(request, { ok: 1, live: null });
-      const { pin: _p, ...pub } = live;
-      return reply(request, { ok: 1, live: pub });
+      return reply(request, { ok: 1, live: publicLive(live) });
     }
 
     if (op === 'next' || op === 'end') {
@@ -120,8 +131,7 @@ export async function onRequestPost({ request, env }) {
         else live.qNo += 1;
       }
       await kv.set(liveKey(code), JSON.stringify(live), { ex: TTL });
-      const { pin: _p, ...pub } = live;
-      return reply(request, { ok: 1, live: pub });
+      return reply(request, { ok: 1, live: publicLive(live) });
     }
 
     if (op === 'answer') {
@@ -129,17 +139,19 @@ export async function onRequestPost({ request, env }) {
       if (!okCode(code) || !okNick(nick)) return reply(request, { ok: 0, error: 'bad req' }, 400);
       const live = parse(await kv.get(liveKey(code)));
       if (!live || !Array.isArray(live.answerKey) || live.answerKey.length < live.qn) return reply(request, { ok: 0, error: '本場答案鍵尚未就緒' }, 409);
+      const qn = clamp(qNo, 40);
+      if (live.phase !== 'q' || qn !== live.qNo) return reply(request, { ok: 0, error: '目前不是這一題的作答時間' }, 409);
       const tag = String(deviceTag || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 8);
       if (tag.length < 4) return reply(request, { ok: 0, error: '裝置識別不完整' }, 400);
       const display = stripBad(nick).trim().slice(0, 12);
       const nk = `${display}·${tag}`;
-      const qn = clamp(qNo, 40);
       const correct = clamp(answerIdx, 3) === live.answerKey[qn - 1];
-      const cur = parse(await kv.hget(rosterKey(code), nk)) || { nick: display, score: 0, qNo: 0, hist: '' };
-      if (qn <= cur.qNo) return reply(request, { ok: 1 }); // 防重送灌分：同題或舊題忽略
-      cur.qNo = qn;
+      const cur = parse(await kv.hget(rosterKey(code), nk)) || { nick: display, score: 0, qNo: 0, hist: {} };
+      cur.hist = normalizeHist(cur.hist);
+      if (Object.prototype.hasOwnProperty.call(cur.hist, qn)) return reply(request, { ok: 1 }); // 同題重送忽略
+      cur.qNo = Math.max(cur.qNo || 0, qn);
       cur.score += correct ? 1 : 0;
-      cur.hist = (cur.hist + (correct ? '1' : '0')).slice(-40);
+      cur.hist[qn] = correct ? 1 : 0;
       await kv.hset(rosterKey(code), { [nk]: JSON.stringify(cur) });
       await kv.expire(rosterKey(code), TTL);
       return reply(request, { ok: 1 });
@@ -168,9 +180,14 @@ export async function onRequestPost({ request, env }) {
 
     if (op === 'roster') {
       if (!okCode(code)) return reply(request, { ok: 0, error: 'bad req' }, 400);
+      const live = parse(await kv.get(liveKey(code)));
+      if (!live || body.pin !== live.pin) return reply(request, { ok: 0, error: '主持碼不對' }, 403);
       const all = await kv.hgetall(rosterKey(code));
       const list = all
-        ? Object.entries(all).map(([, v]) => { const o = parse(v); return { nick: o.nick, score: o.score, qNo: o.qNo, hist: o.hist }; })
+        ? Object.entries(all).map(([, v]) => {
+          const o = parse(v);
+          return { nick: o.nick, score: o.score, qNo: o.qNo, hist: normalizeHist(o.hist) };
+        })
         : [];
       list.sort((a, b) => b.score - a.score || a.qNo - b.qNo);
       return reply(request, { ok: 1, list });

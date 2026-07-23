@@ -7,10 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/main.css" />
+<link rel="stylesheet" href="css/main.css?v=20260724-core" />
 <link rel="stylesheet" href="css/caotang.css" />
 <link rel="stylesheet" href="css/fusion.css" />
-<link rel="stylesheet" href="css/rtbattle.css" />
+<link rel="stylesheet" href="css/rtbattle.css?v=20260724-core" />
 <link rel="stylesheet" href="css/market.css" />
 </head>
 <body>
@@ -22,6 +22,7 @@
       <p class="hero-sub">國中·高中文言文閱讀理解練功站</p>
     </div>
     <div class="header-tools">
+      <button id="teacher-launch" class="teacher-launch" type="button">教師開課</button>
       <button id="guide-reopen" class="guide-reopen" title="怎麼玩" aria-label="怎麼玩，重看新手教學">?</button>
       <div id="ink-hud" class="ink-hud" title="墨錠：答對可得，用於合契與市集，每日賺取有上限">墨錠 <span id="ink-count">0</span><span id="ink-today" class="ink-today"></span></div>
     </div>
@@ -45,12 +46,16 @@
 
 <main id="app"></main>
 <div id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+<footer class="site-footer">
+  <span>本站累計訪客：</span>
+  <img class="visitor-badge" src="https://visitor-badge.laobi.icu/badge?page_id=hk6429.wenyan-jieyou-zhan" alt="文言解憂站累計訪客數" loading="lazy" referrerpolicy="no-referrer" />
+</footer>
 
 <script src="js/store.js"></script>
 <script src="js/renown-store.js"></script>
 <script src="js/wyapi.js"></script>
 <script src="js/flashcard.js"></script>
-<script src="js/quiz.js"></script>
+<script src="js/quiz.js?v=20260724-core"></script>
 <script src="js/battle.js"></script>
 <script src="js/wenhao.js"></script>
 <script src="js/caotang-store.js"></script>
@@ -61,15 +66,13 @@
 <script src="js/rtbattle-logic.js"></script>
 <script src="js/rt-events.js"></script>
 <script src="js/rt-season.js"></script>
-<script src="js/livewall.js"></script>
-<script src="js/rt-ui.js"></script>
+<script src="js/livewall.js?v=20260724-core"></script>
+<script src="js/rt-ui.js?v=20260724-core"></script>
 <script src="js/market-store.js"></script>
 <script src="js/market-adapter.js"></script>
 <script src="js/market-ui.js"></script>
-<script src="js/app.js"></script>
-<!-- 訪客計數：可見數字 visitor-badge、幕後分析 GoatCounter -->
-<img src="https://visitor-badge.laobi.icu/badge?page_id=hk6429.wenyan-jieyou-zhan" alt="訪客人數" loading="lazy" referrerpolicy="no-referrer" style="position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:2147483000;border-radius:999px;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;">
-<script src="js/vendor/gc-config.js"></script>
-<script data-goatcounter="https://hk6429.goatcounter.com/count" async src="js/vendor/count.js"></script>
+<script src="js/app.js?v=20260724-core"></script>
+<script src="js/analytics.js"></script>
+<script data-goatcounter="https://hk6429.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

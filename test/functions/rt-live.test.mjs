@@ -25,6 +25,7 @@ test('start → state → next → answer → roster → end 全流程', async (
   const st = await call(e, { op: 'state', code: '5A03' });
   assert.equal(st.ok, 1);
   assert.equal(st.live.pin, undefined); // pin 絕不外洩
+  assert.equal(st.live.answerKey, undefined); // 答案鍵絕不送到學生端
 
   const n = await call(e, { op: 'next', code: '5A03', pin: '8888' });
   assert.equal(n.live.phase, 'q');
@@ -33,9 +34,10 @@ test('start → state → next → answer → roster → end 全流程', async (
 
   await call(e, { op: 'answer', code: '5A03', nick: '小明', deviceTag: 'abc123', qNo: 1, answerIdx: 1 });
   await call(e, { op: 'answer', code: '5A03', nick: '小華', deviceTag: 'def456', qNo: 1, answerIdx: 0 });
-  const r = await call(e, { op: 'roster', code: '5A03' });
-  assert.deepEqual(r.list[0], { nick: '小明', score: 1, qNo: 1, hist: '1' });
-  assert.deepEqual(r.list[1], { nick: '小華', score: 0, qNo: 1, hist: '0' });
+  assert.equal((await call(e, { op: 'roster', code: '5A03' })).ok, 0);
+  const r = await call(e, { op: 'roster', code: '5A03', pin: '8888' });
+  assert.deepEqual(r.list[0], { nick: '小明', score: 1, qNo: 1, hist: { 1: 1 } });
+  assert.deepEqual(r.list[1], { nick: '小華', score: 0, qNo: 1, hist: { 1: 0 } });
 
   const end = await call(e, { op: 'end', code: '5A03', pin: '8888' });
   assert.equal(end.live.phase, 'end');
@@ -48,9 +50,29 @@ test('answer：重複回報同一題不重複計分；髒字暱稱擋下', async
   await call(e, { op: 'next', code: 'C001', pin: '1234' });
   await call(e, { op: 'answer', code: 'C001', nick: '阿珠', deviceTag: 'abc123', qNo: 1, answerIdx: 2, correct: false });
   await call(e, { op: 'answer', code: 'C001', nick: '阿珠', deviceTag: 'abc123', qNo: 1, answerIdx: 2 }); // 重送
-  const r = await call(e, { op: 'roster', code: 'C001' });
+  const r = await call(e, { op: 'roster', code: 'C001', pin: '1234' });
   assert.equal(r.list[0].score, 1);
   assert.equal((await call(e, { op: 'answer', code: 'C001', nick: '白癡', deviceTag: 'abc123', qNo: 1, answerIdx: 2 })).ok, 0);
+});
+
+test('answer：只接受進行中的目前題號，漏答不會讓逐題紀錄錯位', async () => {
+  const e = env();
+  await call(e, { op: 'start', code: 'SAFE1', pin: '2468', qn: 5, scope: { mode: 'mixed' } });
+  await call(e, { op: 'key', code: 'SAFE1', pin: '2468', answerKey: [1, 2, 3, 0, 1] });
+
+  const before = await call(e, { op: 'answer', code: 'SAFE1', nick: '晚到生', deviceTag: 'late01', qNo: 1, answerIdx: 1 });
+  assert.equal(before.ok, 0);
+
+  await call(e, { op: 'next', code: 'SAFE1', pin: '2468' });
+  const future = await call(e, { op: 'answer', code: 'SAFE1', nick: '晚到生', deviceTag: 'late01', qNo: 3, answerIdx: 3 });
+  assert.equal(future.ok, 0);
+
+  await call(e, { op: 'next', code: 'SAFE1', pin: '2468' });
+  const current = await call(e, { op: 'answer', code: 'SAFE1', nick: '晚到生', deviceTag: 'late01', qNo: 2, answerIdx: 2 });
+  assert.equal(current.ok, 1);
+
+  const r = await call(e, { op: 'roster', code: 'SAFE1', pin: '2468' });
+  assert.deepEqual(r.list[0].hist, { 2: 1 });
 });
 
 test('start：同班級碼進行中場次擋下重開', async () => {

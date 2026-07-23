@@ -49,7 +49,7 @@ const WYFusion = (() => {
           <span class="fusion-nick">道號：<strong>${nickname ? esc(nickname) : '（未設）'}</strong>
             <button class="fusion-mini-btn" id="editNick">${nickname ? '改' : '設定'}</button></span>
         </div>
-        <p class="fusion-rule">合契需 ${WYFusionStore.FUSE_COST} 墨錠。資格：兩篇皆精通（答對率 ≥80%、作答 ≥8 題）且各累積作答 ≥30 題。兩成機率失敗只退還少量墨錠、學習進度不受影響。墨錠不可兌換現實金錢或禮物。</p>
+        <p class="fusion-rule">合契需 ${WYFusionStore.FUSE_COST} 墨錠。資格：兩篇皆符合核心精通門檻，且各累積作答 ≥30 題。兩成機率失敗只退還少量墨錠、學習進度不受影響。墨錠不可兌換現實金錢或禮物。</p>
       </div>
       <div class="fusion-grid">
         ${list.map((w) => cardHtml(w, fusion)).join('')}

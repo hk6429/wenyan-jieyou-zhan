@@ -3,12 +3,12 @@ const WYStore = (() => {
 
   const DAILY_INK_CAP = 200; // 約 80–100 題；花費／退款不受限
   const MAX_IMPORT_INK = 2000;
-  const MASTERY_RULE_TEXT = '精通＝至少自測 10 題、答對率達 80%，且字義、句義、段旨、篇章文意四種題型各答對至少 2 題。';
+  const MASTERY_RULE_TEXT = '精通＝至少自測 10 題、總答對率達 80%，且字義、句義、段旨、篇章文意四種題型各答對至少 2 題、各型正確率皆達 60%。';
   const INK_BY_TYPE = { char: 1, sentence: 2, gist: 3, theme: 4, cloze: 1 };
   const HINT_TICKET_COST = 30;
 
   function blank() {
-    return { texts: {}, streak: { last: null, days: 0, best: 0, firePasses: 2 }, inkIngots: 0, hintTickets: 0, caotangDecorPurchases: 0, classCode: null, inkDay: { date: null, earned: 0 }, lastTextId: null, recent: [] };
+    return { texts: {}, streak: { last: null, days: 0, best: 0, firePasses: 2 }, inkIngots: 0, hintTickets: 0, caotangDecorPurchases: 0, classCode: null, inkDay: { date: null, earned: 0 }, lastTextId: null, recent: [], corrections: { seen: 0, resolved: 0 }, weekly: {} };
   }
 
   const RECENT_WINDOW = 8; // 心流訊號：只看最近 N 題滾動正確率，用於連錯救援／難度自適應（不看終身累計）
@@ -51,6 +51,7 @@ const WYStore = (() => {
   const MASTERY_MIN_TOTAL = 10;   // 需真正練過的題數（自測，不含對戰）
   const MASTERY_MIN_RATIO = 0.8;  // 答對率門檻
   const MASTERY_MIN_PER_TYPE = 2; // 四題型每型至少答對過的下限（廣度：擋「只刷單一題型就精通整篇」）
+  const MASTERY_MIN_TYPE_RATIO = 0.6; // 每型都要有基本穩定度，避免以其他強項掩蓋單一弱項
 
   // 精通判定（B2 假精熟修正）：需 ①自測答滿門檻題數 ②答對率達標 ③四題型每型都練過（廣度）。
   // 對戰作答不計入這裡的 total/types（見 recordAnswer 的 countForMastery），避免重複刷同批題灌分。
@@ -60,7 +61,12 @@ const WYStore = (() => {
     if (t.total < MASTERY_MIN_TOTAL) return false;
     if (t.correct / t.total < MASTERY_MIN_RATIO) return false;
     const types = t.types || {};
-    return QUIZ_TYPES.every((ty) => (types[ty]?.correct || 0) >= MASTERY_MIN_PER_TYPE);
+    return QUIZ_TYPES.every((ty) => {
+      const stat = types[ty] || { correct: 0, total: 0 };
+      return stat.correct >= MASTERY_MIN_PER_TYPE
+        && stat.total > 0
+        && stat.correct / stat.total >= MASTERY_MIN_TYPE_RATIO;
+    });
   }
 
   // ── per-item 間隔複習 / 錯題本（SRS）：SRS「今天複習」、錯題重測、閃卡自評三者共用同一份 state.items ──
@@ -73,10 +79,13 @@ const WYStore = (() => {
     if (!state.wrong) state.wrong = {};
     const today = dayNum();
     const it = state.items[qId] || { reps: 0, ease: 2.5, interval: 0, due: today, lapses: 0, textId };
+    const wasWrong = !!state.wrong[qId];
+    if (!state.corrections) state.corrections = { seen: 0, resolved: 0 };
     if (grade === 'again') {
       it.reps = 0; it.interval = 0; it.lapses += 1;
       it.ease = Math.max(1.3, it.ease - 0.2); it.due = today; // 當日再測
       state.wrong[qId] = true;
+      if (!wasWrong) state.corrections.seen += 1;
     } else {
       if (grade === 'hard') {
         it.reps += 1;
@@ -88,6 +97,7 @@ const WYStore = (() => {
       }
       it.due = today + it.interval;
       delete state.wrong[qId]; // 答對＝訂正閉環，移出錯題本
+      if (wasWrong) state.corrections.resolved += 1;
     }
     it.textId = textId || it.textId;
     state.items[qId] = it;
@@ -158,6 +168,23 @@ const WYStore = (() => {
     const ok = validIds ? new Set(validIds) : null;
     return Object.keys(wrong).filter((qId) => !ok || ok.has(qId));
   }
+
+  function correctionStats() {
+    const c = load().corrections || { seen: 0, resolved: 0 };
+    return { seen: c.seen || 0, resolved: c.resolved || 0, ratio: c.seen ? (c.resolved || 0) / c.seen : 0 };
+  }
+
+  function recordWeeklyResult(weekKey, correct, total) {
+    if (!/^\d{4}-W\d{2}$/.test(String(weekKey)) || !Number.isInteger(correct) || !Number.isInteger(total) || total < 1 || correct < 0 || correct > total) return null;
+    const state = load();
+    if (!state.weekly) state.weekly = {};
+    const prev = state.weekly[weekKey] || { attempts: 0, best: 0, total };
+    state.weekly[weekKey] = { attempts: prev.attempts + 1, best: Math.max(prev.best || 0, correct), total };
+    save(state);
+    return state.weekly[weekKey];
+  }
+
+  function weeklyResult(weekKey) { return (load().weekly || {})[weekKey] || { attempts: 0, best: 0, total: 20 }; }
 
   // 逐題型正確率統計（學習儀表板用）：回傳 [{type,correct,total,ratio}]，含尚未作答的題型（total 0）
   function typeStats() {
@@ -309,7 +336,7 @@ const WYStore = (() => {
   function totalCorrect() {
     return Object.values(load().texts || {}).reduce((sum, t) => sum + (t.correct || 0), 0);
   }
-  function companionLevel() { return Math.floor(totalCorrect() / 20); }
+  function companionLevel() { return Math.min(10, Math.floor(totalCorrect() / 20)); }
   function getHintTickets() { return load().hintTickets || 0; }
   function buyHintTicket() {
     const state = load();
@@ -323,8 +350,10 @@ const WYStore = (() => {
     if ((state.hintTickets || 0) < 1) return false;
     state.hintTickets -= 1; save(state); return true;
   }
+  const CAOTANG_DECOR_CAP = 4;   // 限定仙鶴庭園上限（與 caotang-store DECOR_KINDS.crane.cap 一致）
   function buyCaotangDecor(cost = 45) {
     const state = load();
+    if ((state.caotangDecorPurchases || 0) >= CAOTANG_DECOR_CAP) return 'capped';
     if ((state.inkIngots || 0) < cost) return false;
     state.inkIngots -= cost;
     state.caotangDecorPurchases = (state.caotangDecorPurchases || 0) + 1;
@@ -378,7 +407,7 @@ const WYStore = (() => {
   return {
     load, save, getTextState, recordAnswer, recordItem, masteryRatio, allMastered, touchStreak, getStreak,
     getInk, addInk, spendInk, earnInk, inkToday, DAILY_INK_CAP, typeStats, getClassCode, setClassCode,
-    computeMastered, dueItems, dueCount, wrongItems, dayNum, removeItems,
+    computeMastered, dueItems, dueCount, wrongItems, correctionStats, recordWeeklyResult, weeklyResult, dayNum, removeItems,
     getLastTextId, recentAccuracy, studiedToday, consumeStreakMilestone, peekStreakMilestone, streakAlive, exportAll, importAll,
     MASTERY_RULE_TEXT, INK_BY_TYPE, HINT_TICKET_COST, getHintTickets, buyHintTicket, useHintTicket, buyCaotangDecor,
     totalCorrect, companionLevel,

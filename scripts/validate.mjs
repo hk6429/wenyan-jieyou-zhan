@@ -5,12 +5,15 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 
-const texts = JSON.parse(readFileSync(new URL('../data/texts.json', import.meta.url)));
+const textsSource = process.env.WY_TEXTS_PATH || new URL('../data/texts.json', import.meta.url);
+const texts = JSON.parse(readFileSync(textsSource, 'utf8'));
 const battleSrc = readFileSync(join(rootDir, 'js/battle.js'), 'utf8');
 
 const VALID_LEVELS = new Set(['J', 'S']);
 const VALID_TYPES = new Set(['char', 'sentence', 'gist', 'theme']);
 const SIMPLIFIED_HINTS = /[国来当为学问长会与义]/; // 常見簡體殘留字，命中則需人工複核
+const EXPLAIN_OPTION_NUMBER = /選項\s*[1-4一二三四]/;
+const MOJIBAKE = /[\u0080-\u009f\ufffd]|(?:Ã|Â|â|å|æ|ç|è|é|ï|ð)[^\s，。；：「」『』（）]{1,8}/u;
 
 let errors = [];
 let warnings = [];
@@ -19,7 +22,11 @@ const seenIds = new Set();
 for (const t of texts) {
   const tag = `[${t.id ?? '??'} ${t.title ?? ''}]`;
 
-  for (const field of ['id', 'title', 'author', 'era', 'level', 'genre', 'passage', 'segments', 'questions']) {
+  if (MOJIBAKE.test(JSON.stringify(t))) {
+    errors.push(`${tag} 含疑似 UTF-8 誤解碼字串`);
+  }
+
+  for (const field of ['id', 'title', 'author', 'era', 'level', 'difficulty', 'genre', 'passage', 'segments', 'questions']) {
     if (t[field] === undefined || t[field] === null || t[field] === '') {
       errors.push(`${tag} 缺少必填欄位 ${field}`);
     }
@@ -32,6 +39,16 @@ for (const t of texts) {
 
   if (t.level && !VALID_LEVELS.has(t.level)) {
     errors.push(`${tag} level 不合法：${t.level}（只能是 J 或 S）`);
+  }
+  if (!Number.isInteger(t.difficulty) || t.difficulty < 1 || t.difficulty > 5) {
+    errors.push(`${tag} difficulty 不合法：${t.difficulty}（必須是 1–5 的整數）`);
+  }
+
+  // readingStrategy：每篇「這一篇的閱讀切入點」至少 2 條、每條為非空字串（通用四步法在 UI 常數，不入資料）。
+  if (!Array.isArray(t.readingStrategy) || t.readingStrategy.length < 2) {
+    errors.push(`${tag} 缺少 readingStrategy 閱讀策略（至少 2 條逐篇切入點）`);
+  } else if (t.readingStrategy.some((s) => typeof s !== 'string' || s.trim().length < 6)) {
+    errors.push(`${tag} readingStrategy 有空白或過短的條目`);
   }
 
   if (!Array.isArray(t.segments) || t.segments.length < 1) {
@@ -69,6 +86,7 @@ for (const t of texts) {
     errors.push(`${tag} questions 至少要有 1 題`);
   } else {
     const seenQIds = new Set();
+    const seenStems = new Map();
     for (const q of t.questions) {
       const qtag = `${tag} ${q.id ?? '??'}`;
       if (seenQIds.has(q.id)) errors.push(`${qtag} 題目 id 重複`);
@@ -82,7 +100,21 @@ for (const t of texts) {
       if (typeof q.answer !== 'number' || q.answer < 0 || q.answer > 3) {
         errors.push(`${qtag} answer 必須是 0-3 的整數`);
       }
+      if (q.stem && Array.isArray(q.options) && q.options.length === 4
+        && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 4) {
+        const stemKey = q.stem.replace(/\s+/g, '');
+        const answerText = String(q.options[q.answer]).replace(/\s+/g, '');
+        const previous = seenStems.get(stemKey);
+        if (previous && previous.answerText !== answerText) {
+          errors.push(`${qtag} 與 ${previous.id} 重複題幹卻有不同正解`);
+        } else if (!previous) {
+          seenStems.set(stemKey, { id: q.id, answerText });
+        }
+      }
       if (!q.explain) warnings.push(`${qtag} 缺少 explain 解析`);
+      else if (EXPLAIN_OPTION_NUMBER.test(q.explain)) {
+        errors.push(`${qtag} 解析引用選項編號，選項洗牌後會失效`);
+      }
     }
   }
 
@@ -124,7 +156,7 @@ for (const t of texts) {
 const exploitPct = (exploitable / seenQTotal() * 100).toFixed(1);
 if (exploitable > MAX_EXPLOITABLE) {
   errors.push(`選項長度外洩題數 ${exploitable}（${exploitPct}%）超過基線 ${MAX_EXPLOITABLE}——不得回升，請改寫誘答為等長`);
-} else {
+} else if (exploitable > 0) {
   warnings.push(`選項長度外洩題數 ${exploitable}（${exploitPct}%），基線 ${MAX_EXPLOITABLE}（越低越好，目標 ≤340）`);
 }
 function seenQTotal() {
