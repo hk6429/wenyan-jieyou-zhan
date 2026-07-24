@@ -892,7 +892,28 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .weekly-card > strong{ color:var(--zhu); white-space:nowrap; }
 .list-tools{ display:flex; justify-content:flex-end; align-items:center; gap:8px; margin:8px 2px; color:var(--ink-dan); font-size:.82rem; }
 .list-tools select{ min-height:44px; padding:6px 28px 6px 10px; color:var(--ink-nong); background:var(--paper); border:1px solid var(--ink-dan); border-radius:8px; font:inherit; }
-.site-footer{ max-width:720px; margin:4px auto 20px; padding:8px 16px; text-align:center; color:var(--ink-dan); font-size:.75rem; }
+.site-footer{ max-width:720px; margin:4px auto 20px; padding:8px 16px; text-align:center; color:var(--ink-dan); font-size:.75rem; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px 14px; }
+.site-footer>div{ display:flex; align-items:center; justify-content:center; }
+.report-open{ border:0; border-bottom:1px solid currentColor; background:transparent; color:var(--ink-dan); padding:4px 2px; font:inherit; cursor:pointer; }
+.report-open:hover,.report-open:focus-visible{ color:var(--zhu); }
+.report-dialog{ width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); border:1px solid var(--line); border-radius:14px; padding:22px; background:var(--paper); color:var(--ink-jiao); box-shadow:var(--shadow-lift); }
+.report-dialog::backdrop{ background:rgba(26,22,19,.58); }
+.report-heading{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.report-heading h2{ margin:0 0 4px; color:var(--zhu); font-family:var(--font-brush); font-size:1.65rem; }
+.report-heading p{ margin:0; color:var(--ink-dan); font-size:.88rem; line-height:1.6; }
+.report-close{ flex:0 0 44px; width:44px; height:44px; border:0; border-radius:50%; background:transparent; color:var(--ink-dan); font-size:1.8rem; line-height:1; cursor:pointer; }
+.report-close:hover,.report-close:focus-visible{ background:var(--paper-warm); color:var(--zhu); }
+.report-dialog label{ display:block; margin:12px 0 6px; color:var(--ink-zhong); font-weight:700; font-size:.9rem; }
+.report-dialog label span{ color:var(--ink-dan); font-weight:400; }
+.report-dialog select,.report-dialog textarea,.report-dialog input{ box-sizing:border-box; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:#fffdf8; color:var(--ink-jiao); font:inherit; }
+.report-dialog textarea{ resize:vertical; min-height:132px; line-height:1.6; }
+.report-dialog select:focus,.report-dialog textarea:focus,.report-dialog input:focus{ outline:2px solid var(--zhu); outline-offset:1px; border-color:var(--zhu); }
+.report-hp{ position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+.report-status{ min-height:1.5em; margin:12px 0 0; font-size:.88rem; }
+.report-status[data-state="success"]{ color:#376944; }
+.report-status[data-state="error"]{ color:var(--zhu); }
+.report-actions{ display:flex; justify-content:flex-end; margin-top:10px; }
+.report-actions .primary{ min-height:44px; min-width:112px; }
 .visitor-badge{ min-width:80px; min-height:20px; vertical-align:middle; }
 .ct-decor.is-keyboard-moving{ outline:3px solid var(--zhu); outline-offset:3px; }
 

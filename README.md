@@ -35,6 +35,16 @@ npm run verify
 
 `verify` 會依序執行資料品質檢查、全部單元／整合測試，以及瀏覽器煙霧測試。
 
+## 問題回報
+
+頁尾的「問題回報」會呼叫 Cloudflare Pages Function `/api/report`，再由伺服器端轉送至
+Telegram。正式環境需設定以下加密環境變數，實際值不可寫入 Git：
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+每個來源 IP 每小時最多送出 5 次；表單另含蜜罐欄位，以減少自動化垃圾訊息。
+
 ## 資料結構
 
 見 `data/texts.json`，每篇文本含 `passage`（原文全文）、`segments`（分段，供段旨題使用）、

@@ -47,13 +47,48 @@
 <main id="app"></main>
 <div id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <footer class="site-footer">
-  <span>本站累計訪客：</span>
-  <img class="visitor-badge" src="https://visitor-badge.laobi.icu/badge?page_id=hk6429.wenyan-jieyou-zhan" alt="文言解憂站累計訪客數" loading="lazy" referrerpolicy="no-referrer" />
+  <div>
+    <span>本站累計訪客：</span>
+    <img class="visitor-badge" src="https://visitor-badge.laobi.icu/badge?page_id=hk6429.wenyan-jieyou-zhan" alt="文言解憂站累計訪客數" loading="lazy" referrerpolicy="no-referrer" />
+  </div>
+  <button id="report-open" class="report-open" type="button">問題回報</button>
 </footer>
+
+<dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
+  <form id="report-form">
+    <div class="report-heading">
+      <div>
+        <h2 id="report-title">問題回報</h2>
+        <p>發現錯字、內容疑問或功能異常，都歡迎告訴我們。</p>
+      </div>
+      <button id="report-close" class="report-close" type="button" aria-label="關閉問題回報">×</button>
+    </div>
+    <label for="report-category">問題類型</label>
+    <select id="report-category" name="category">
+      <option value="內容錯誤">內容錯誤</option>
+      <option value="功能異常">功能異常</option>
+      <option value="操作建議">操作建議</option>
+      <option value="其他">其他</option>
+    </select>
+    <label for="report-message">問題說明</label>
+    <textarea id="report-message" name="message" minlength="10" maxlength="2000" rows="6" required placeholder="請告訴我們在哪個畫面、做了什麼，以及發生什麼情況。"></textarea>
+    <label for="report-contact">聯絡方式 <span>（選填）</span></label>
+    <input id="report-contact" name="contact" maxlength="120" autocomplete="email" placeholder="電子郵件或其他方便聯絡的方式" />
+    <div class="report-hp" aria-hidden="true">
+      <label for="report-website">網站</label>
+      <input id="report-website" name="website" tabindex="-1" autocomplete="off" />
+    </div>
+    <p id="report-status" class="report-status" role="status" aria-live="polite"></p>
+    <div class="report-actions">
+      <button class="primary" id="report-submit" type="submit">送出回報</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="js/store.js?v=20260724-p0"></script>
 <script src="js/renown-store.js?v=20260724-p0"></script>
 <script src="js/wyapi.js"></script>
+<script src="js/report.js?v=20260724"></script>
 <script src="js/flashcard.js"></script>
 <script src="js/quiz.js?v=20260724-core"></script>
 <script src="js/battle.js"></script>

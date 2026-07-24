@@ -74,6 +74,23 @@ page.on('pageerror', (err) => errors.push(String(err)));
 await page.goto(`${BASE}/index.html`);
 await page.waitForSelector('.text-list-item');
 
+// 問題回報：頁尾開啟表單，送出至統一 API，成功後留在對話框顯示確認訊息。
+let reportPayload = null;
+await page.route('**/api/report', async (route) => {
+  reportPayload = route.request().postDataJSON();
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: 1 }) });
+});
+await page.click('#report-open');
+await page.selectOption('#report-category', '內容錯誤');
+await page.fill('#report-message', '〈桃花源記〉第二段的注釋似乎有誤，請協助確認。');
+await page.fill('#report-contact', 'teacher@example.com');
+await page.click('#report-submit');
+await page.waitForSelector('#report-status[data-state="success"]');
+if (reportPayload?.category !== '內容錯誤') errors.push('問題回報未送出所選類型');
+if (!reportPayload?.pageUrl?.startsWith(BASE)) errors.push('問題回報未附目前頁面網址');
+if (await page.locator('#report-dialog[open]').count() !== 1) errors.push('問題回報成功後未保留確認畫面');
+await page.click('#report-close');
+
 // 全班文會真實雙端流程：教師出題後學生應立即收到；快速重複點擊不得跳題。
 // 用瀏覽器公開介面操作教師／學生兩頁，只在網路邊界攔截後端，避免把實作細節當契約。
 const liveSession = { live: null, answerKey: [], rows: [] };
