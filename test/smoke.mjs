@@ -73,6 +73,72 @@ page.on('pageerror', (err) => errors.push(String(err)));
 
 await page.goto(`${BASE}/index.html`);
 await page.waitForSelector('.text-list-item');
+
+// 全班文會真實雙端流程：教師出題後學生應立即收到；快速重複點擊不得跳題。
+// 用瀏覽器公開介面操作教師／學生兩頁，只在網路邊界攔截後端，避免把實作細節當契約。
+const liveSession = { live: null, answerKey: [], rows: [] };
+const liveRoute = async (route) => {
+  const body = route.request().postDataJSON();
+  let result = { ok: 0, error: 'bad op' };
+  if (body.op === 'start') {
+    liveSession.live = { seed: 24681357, qn: body.qn, scope: body.scope, phase: 'lobby', qNo: 0 };
+    result = { ok: 1, live: liveSession.live };
+  } else if (body.op === 'key') {
+    liveSession.answerKey = body.answerKey;
+    result = { ok: 1 };
+  } else if (body.op === 'state') {
+    result = { ok: 1, live: liveSession.live };
+  } else if (body.op === 'next') {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    if (liveSession.live.phase === 'lobby') {
+      liveSession.live = { ...liveSession.live, phase: 'q', qNo: 1 };
+    } else if (liveSession.live.qNo >= liveSession.live.qn) {
+      liveSession.live = { ...liveSession.live, phase: 'end' };
+    } else {
+      liveSession.live = { ...liveSession.live, qNo: liveSession.live.qNo + 1 };
+    }
+    result = { ok: 1, live: liveSession.live };
+  } else if (body.op === 'roster') {
+    result = { ok: 1, list: liveSession.rows };
+  } else if (body.op === 'answer') {
+    result = { ok: 1 };
+  } else if (body.op === 'end') {
+    liveSession.live = liveSession.live ? { ...liveSession.live, phase: 'end' } : null;
+    result = { ok: 1, live: liveSession.live };
+  }
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
+};
+await page.route('**/api/rt-live', liveRoute);
+const studentPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await studentPage.route('**/api/rt-live', liveRoute);
+await studentPage.goto(`${BASE}/index.html`);
+await studentPage.waitForSelector('.text-list-item');
+
+await page.click('#teacher-launch');
+await page.fill('#rt-h-code', '5A03');
+await page.fill('#rt-h-pin', '8888');
+await page.click('#rt-h-start');
+await page.waitForSelector('#rt-h-next');
+
+await studentPage.evaluate(() => WYRt.render(document.getElementById('app')));
+await studentPage.click('[data-go="live-stu"]');
+await studentPage.fill('#rt-live-code', '5A03');
+await studentPage.fill('#rt-live-nick', '測試生');
+await studentPage.click('#rt-live-enter');
+
+await page.evaluate(() => document.querySelector('#rt-h-next').click());
+await studentPage.waitForSelector('.rt-stem', { timeout: 1200 }).catch(() => errors.push('教師出第一題後，學生端未立即顯示題目'));
+
+await page.evaluate(() => {
+  const button = document.querySelector('#rt-h-next');
+  button.click();
+  button.click();
+});
+await page.waitForTimeout(350);
+if (liveSession.live?.qNo !== 2) errors.push(`教師快速重複點擊造成跳題：預期第 2 題，實際第 ${liveSession.live?.qNo ?? '未知'} 題`);
+await studentPage.close();
+await page.goto(`${BASE}/index.html`);
+await page.waitForSelector('.text-list-item');
 const mobileNav = await page.evaluate(() => ({
   core: getComputedStyle(document.querySelector('nav.tabs:not(.tabs-sub)')).position,
   coreBottom: getComputedStyle(document.querySelector('nav.tabs:not(.tabs-sub)')).bottom,

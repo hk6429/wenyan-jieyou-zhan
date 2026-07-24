@@ -639,7 +639,7 @@ const WYRt = (() => {
     const st = { code, nick, qs: null, seed: 0, scope: null, answeredQ: 0, score: 0, curQ: -1, locked: false };
     shell(`${backBar('離開文會')}<div class="card rt-loading">已進場，等待老師開始…</div>`);
     bindBack();
-    every(3000, async () => {
+    const syncLiveState = async () => {
       if (gone()) return clearTimers();
       const r = await api('/api/rt-live', { op: 'state', code });
       if (!r || !r.ok || !r.live) return;
@@ -647,7 +647,9 @@ const WYRt = (() => {
       if (!st.qs) { st.seed = live.seed; st.scope = live.scope; st.qs = L().buildRounds(TEXTS, live.scope, live.seed, live.qn); }
       if (live.phase === 'end') { clearTimers(); return liveStudentEnd(st); }
       if (live.phase === 'q' && live.qNo !== st.curQ) { st.curQ = live.qNo; st.locked = false; renderLiveQ(st); }
-    });
+    };
+    syncLiveState();
+    every(750, syncLiveState);
   }
 
   function renderLiveQ(st) {
@@ -770,6 +772,7 @@ const WYRt = (() => {
 
   function liveHostPanel(h) {
     clearTimers();
+    let actionPending = false;
     const draw = (phase, qNo, count) => {
       shell(`
         ${backBar('結束並離開')}
@@ -779,18 +782,45 @@ const WYRt = (() => {
           <p class="rt-sub">學生在「全班文會（學生）」輸入此班級碼進場。範圍：${scopeLabel(h.scope)}</p>
           <div class="rt-host-state">階段：${phase === 'lobby' ? '大廳（尚未出題）' : phase === 'end' ? '已結束' : `第 ${qNo}/${h.qn} 題`}　已答：${count} 人</div>
           <div class="rt-result-btns">
-            <button class="rt-btn rt-btn--main" id="rt-h-next" ${phase === 'end' ? 'disabled' : ''}>${phase === 'lobby' ? '出第一題' : qNo >= h.qn ? '收榜' : '下一題'}</button>
-            <button class="rt-btn" id="rt-h-end" ${phase === 'end' ? 'disabled' : ''}>提前結束</button>
+            <button class="rt-btn rt-btn--main" id="rt-h-next" ${phase === 'end' || actionPending ? 'disabled' : ''}>${phase === 'lobby' ? '出第一題' : qNo >= h.qn ? '收榜' : '下一題'}</button>
+            <button class="rt-btn" id="rt-h-end" ${phase === 'end' || actionPending ? 'disabled' : ''}>提前結束</button>
           </div>
+          <div class="rt-err" id="rt-h-action-msg" role="status"></div>
           <div id="rt-h-herald"></div>
         </div>
       `);
       const leave = root.querySelector('[data-back]');
       if (leave) leave.addEventListener('click', async () => { await api('/api/rt-live', { op: 'end', code: h.code, pin: h.pin }); clearTimers(); home(); });
       const nx = root.querySelector('#rt-h-next');
-      if (nx) nx.addEventListener('click', async () => { await api('/api/rt-live', { op: 'next', code: h.code, pin: h.pin }); });
+      if (nx) nx.addEventListener('click', async () => {
+        if (actionPending) return;
+        actionPending = true;
+        nx.disabled = true;
+        const result = await api('/api/rt-live', { op: 'next', code: h.code, pin: h.pin });
+        actionPending = false;
+        if (!result || !result.ok || !result.live) {
+          nx.disabled = false;
+          const message = root.querySelector('#rt-h-action-msg');
+          if (message) message.textContent = (result && result.error) || '出題失敗，請確認連線後再試。';
+          return;
+        }
+        draw(result.live.phase, result.live.qNo, 0);
+      });
       const en = root.querySelector('#rt-h-end');
-      if (en) en.addEventListener('click', async () => { await api('/api/rt-live', { op: 'end', code: h.code, pin: h.pin }); });
+      if (en) en.addEventListener('click', async () => {
+        if (actionPending) return;
+        actionPending = true;
+        en.disabled = true;
+        const result = await api('/api/rt-live', { op: 'end', code: h.code, pin: h.pin });
+        actionPending = false;
+        if (!result || !result.ok || !result.live) {
+          en.disabled = false;
+          const message = root.querySelector('#rt-h-action-msg');
+          if (message) message.textContent = (result && result.error) || '結束文會失敗，請確認連線後再試。';
+          return;
+        }
+        draw(result.live.phase, result.live.qNo, 0);
+      });
     };
     draw('lobby', 0, 0);
     every(3000, async () => {

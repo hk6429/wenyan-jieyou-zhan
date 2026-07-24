@@ -19,7 +19,7 @@ function fakeMount() {
 }
 
 test('教師可從永遠可見入口直接開啟主持畫面，不依賴江湖解鎖', async () => {
-  assert.match(index, /id="teacher-launch"[^>]*>教師開課</);
+  assert.match(index, /id="teacher-launch"[^>]*>教師開課・文戰擂台</);
   await import('../js/rt-ui.js');
   const mount = fakeMount();
   globalThis.WYRt.openTeacher(mount);
