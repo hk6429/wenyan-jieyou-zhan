@@ -17,7 +17,10 @@ const WYFusion = (() => {
       getInk: () => WYStore.getInk(),
       spendInk: (a) => WYStore.spendInk(a),
       addInk: (a) => WYStore.addInk(a),
-      mastery: (tid) => { const t = WYStore.getTextState(tid); return { ratio: WYStore.masteryRatio(tid), total: t.total }; },
+      mastery: (tid) => {
+        const t = WYStore.getTextState(tid);
+        return { mastered: t.mastered === true, ratio: WYStore.masteryRatio(tid), total: t.total };
+      },
       title: (tid) => textOf(tid).title,
       author: (tid) => textOf(tid).author,
     };
@@ -49,7 +52,7 @@ const WYFusion = (() => {
           <span class="fusion-nick">道號：<strong>${nickname ? esc(nickname) : '（未設）'}</strong>
             <button class="fusion-mini-btn" id="editNick">${nickname ? '改' : '設定'}</button></span>
         </div>
-        <p class="fusion-rule">合契需 ${WYFusionStore.FUSE_COST} 墨錠。資格：兩篇皆符合核心精通門檻，且各累積作答 ≥30 題。兩成機率失敗只退還少量墨錠、學習進度不受影響。墨錠不可兌換現實金錢或禮物。</p>
+        <p class="fusion-rule">合契需 ${WYFusionStore.FUSE_COST} 墨錠。資格：兩篇皆符合四題型核心精通門檻，且各累積作答 ≥30 題；達標後保證成功。墨錠不可兌換現實金錢或禮物。</p>
       </div>
       <div class="fusion-grid">
         ${list.map((w) => cardHtml(w, fusion)).join('')}
@@ -176,21 +179,12 @@ const WYFusion = (() => {
     WYFusionStore.saveFusion(fusion);
     if (!res.ok) { draw(); return; }
     const w = WYFusionStore.WENPO_BY_ID.get(wenpoId);
-    if (res.result === 'success') {
-      const ov = overlay(`
-        <div class="fuse-burst">✦</div>
-        <h3>文魄喚醒：${esc(w.name)}</h3>
-        <p class="born-line">${esc(res.wenpo.bornLine)}</p>
-        <button class="primary" id="fuseClose">收下這位知音</button>`);
-      ov.querySelector('#fuseClose').onclick = () => { closeOverlay(ov); draw(); };
-    } else {
-      const ov = overlay(`
-        <h3>文氣未合</h3>
-        <p class="born-line">${esc(res.line)}</p>
-        <p class="ink-back">退還墨錠 +${res.inkBack}</p>
-        <button class="primary" id="fuseClose">改日再會</button>`);
-      ov.querySelector('#fuseClose').onclick = () => { closeOverlay(ov); draw(); };
-    }
+    const ov = overlay(`
+      <div class="fuse-burst">✦</div>
+      <h3>文魄喚醒：${esc(w.name)}</h3>
+      <p class="born-line">${esc(res.wenpo.bornLine)}</p>
+      <button class="primary" id="fuseClose">收下這位知音</button>`);
+    ov.querySelector('#fuseClose').onclick = () => { closeOverlay(ov); draw(); };
   }
 
   function overlay(inner) {

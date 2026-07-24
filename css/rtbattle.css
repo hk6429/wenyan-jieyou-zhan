@@ -119,6 +119,10 @@
 
 .rt-herald { font-family: var(--font-read); line-height: 1.9; margin: .8rem 0; padding: .8rem 1rem; background: var(--paper-warm); border-radius: 10px; color: var(--ink-jiao); }
 .rt-host-state { margin: .6rem 0; font-size: .95rem; color: var(--dai); font-weight: 600; }
+.rt-projector-safe{ display:flex; align-items:center; justify-content:center; gap:.45rem; margin:.55rem 0; color:var(--ink-zhong); font-size:.85rem; }
+.rt-projector-safe input{ width:20px; height:20px; }
+.rt-projector-summary{ margin:.8rem 0; padding:.8rem 1rem; border:1px solid var(--dai); border-radius:10px; background:rgba(64,104,91,.08); text-align:center; color:var(--ink-zhong); }
+.rt-projector-summary p{ margin:.35rem 0 0; font-size:.82rem; }
 .rt-privacy { color: var(--ink-dan); font-size: .82rem; line-height: 1.65; }
 .rt-review { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); text-align: left; }
 .rt-review h4 { margin: 0 0 .3rem; font-family: var(--font-brush); font-size: 1.15rem; color: var(--ink-jiao); }

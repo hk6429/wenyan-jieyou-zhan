@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import '../js/caotang-store.js';
 const CT = globalThis.WYCaotangStore;
 
-// 用真實 27 篇資料當固定樣本（掛軸/名句池要對真原文驗證）
+// 用真實題庫資料當固定樣本（掛軸/名句池要對真原文驗證）
 const TEXTS = JSON.parse(readFileSync(new URL('../data/texts.json', import.meta.url)));
 
 // 四題型各≥2 的廣度（精通門檻要求，與核心 computeMastered 一致）
@@ -69,12 +69,12 @@ test('flourishTier 門檻 0/10/30/60/100', () => {
   assert.equal(CT.FLOURISH_TIERS.length, 5);
 });
 
-test('文氣十境：精通篇數 / 27 → 十階', () => {
+test('文氣十境：以目前題庫篇數為分母，不寫死舊版 27 篇', () => {
   assert.equal(CT.gateStage(TEXTS, progressOf({})).stage, 0);
-  // 精通 3 篇 → 3/27=0.111 → floor(1.11)=1
-  const p3 = progressOf({ t01: M, t02: M, t05: M });
-  const g = CT.gateStage(TEXTS, p3);
-  assert.equal(g.masteredCount, 3);
+  const p4 = progressOf({ t01: M, t02: M, t05: M, t06: M });
+  const g = CT.gateStage(TEXTS, p4);
+  assert.equal(g.masteredCount, 4);
+  assert.equal(g.totalTexts, TEXTS.length);
   assert.equal(g.stage, 1);
   assert.equal(g.total, 10);
   assert.equal(g.name, CT.GATE_STAGES[1]);
@@ -172,7 +172,7 @@ test('匾額／對聯：只能選名句池的句子（鎖死學習量）', () =>
 });
 
 test('慶典佇列：升境與院落升級各一次；seed 靜默入帳；markCelebrated 去重', () => {
-  const prog = progressOf({ t01: M, t02: M, t05: M }); // stage 1 → gate-1
+  const prog = progressOf({ t01: M, t02: M, t05: M, t06: M }); // 34 篇題庫需 4 篇進 stage 1
   const s = CT.defaultState();
   let pend = CT.pendingCelebrations(TEXTS, prog, s);
   assert.ok(pend.some((p) => p.id === 'gate-1'));
@@ -190,6 +190,9 @@ test('getView 一次拿齊整包視圖', () => {
   const prog = progressOf({ t10: M });
   const v = CT.getView(TEXTS, prog, CT.defaultState(), { days: 3 });
   assert.equal(v.gate.total, 10);
+  assert.equal(v.gate.totalTexts, TEXTS.length);
+  assert.equal(v.achievements.find((a) => a.id === 'all-scrolls').need, TEXTS.length);
+  assert.match(v.achievements.find((a) => a.id === 'all-scrolls').desc, new RegExp(String(TEXTS.length)));
   assert.equal(v.courtyards.length, 3);
   assert.ok(Array.isArray(v.scrolls));
   assert.ok(Array.isArray(v.decorations));

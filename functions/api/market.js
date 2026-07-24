@@ -68,7 +68,6 @@ const ZCLASS = (c) => `wy_mkt:z:c:${c}`;
 const ZPUB = 'wy_mkt:z:pub';
 const ROSTER = (c) => `wy_mkt:roster:${c}`;     // 同班已知暱稱（保留單驗證用；hash nick→'1'）
 const DEALS = (c) => `wy_mkt:deals:${c}`;        // 集市達人成交量 zset
-const ITEM_TTL = 7 * 86400;
 const MAX_LISTINGS = 3;   // 同賣家同時最多 3 筆
 const DAILY_BUY_CAP = 3;  // 買家每日限購 3 件
 const RARE_WEEK_CAP = 10; // 珍品每班每週限量 10 件
@@ -133,7 +132,9 @@ export async function marketOp(redis, body, ctx, nowMs = Date.now()) {
     const claimKey = randomBytes(12).toString('hex');
     const rec = { id, gearId, seller: sellerNick, price, ts: nowMs, classCode, pub: body.pub ? 1 : 0, reserveFor };
     const sig = sigOf({ gearId, price, seller: sellerNick, id }, ctx.secret);
-    await redis.set(ITEM(id), JSON.stringify({ ...rec, claimKey, sig, sold: 0, claimed: 0, card: 0 }), { ex: ITEM_TTL });
+    // 掛單憑證不設自動到期：道具已先從賣家本機移除，若伺服器先刪憑證會造成資產無法返還。
+    // 未售出可隨時 cancel 拿回；售出則保留到賣家主動 claim，避免「七天後憑空消失」。
+    await redis.set(ITEM(id), JSON.stringify({ ...rec, claimKey, sig, sold: 0, claimed: 0, card: 0 }));
     await redis.zadd(ZCLASS(classCode), { score: price, member: memberOf(rec) });
     if (rec.pub) await redis.zadd(ZPUB, { score: price, member: memberOf(rec) });
     await touchRoster(redis, ctx, classCode, sellerNick); // 賣家登記進同班名單
@@ -159,7 +160,7 @@ export async function marketOp(redis, body, ctx, nowMs = Date.now()) {
     await redis.zrem(ZCLASS(rec.classCode), memberOf(rec));
     if (rec.pub) await redis.zrem(ZPUB, memberOf(rec));
     rec.sold = 1; rec.soldTs = nowMs; rec.buyer = buyerNick; rec.card = cardId;
-    await redis.set(ITEM(id), JSON.stringify(rec), { ex: ITEM_TTL });
+    await redis.set(ITEM(id), JSON.stringify(rec));
     // 集市達人：買賣雙方各 +1 成交量（鼓勵流通，不偏袒囤貨）
     await redis.zincrby(DEALS(rec.classCode), 1, rec.seller);
     await redis.zincrby(DEALS(rec.classCode), 1, buyerNick);
@@ -183,7 +184,7 @@ export async function marketOp(redis, body, ctx, nowMs = Date.now()) {
     if (!rec.sold) return { ok: 0, sold: 0 };
     if (rec.claimed) return { ok: 0, error: '貨款已領過' };
     rec.claimed = 1;
-    await redis.set(ITEM(body.id), JSON.stringify(rec), { ex: ITEM_TTL });
+    await redis.set(ITEM(body.id), JSON.stringify(rec));
     return { ok: 1, pearls: Math.floor(rec.price * (1 - TAX)), buyer: rec.buyer || '', card: rec.card || 0 };
   }
 

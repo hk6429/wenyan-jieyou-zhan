@@ -9,14 +9,13 @@
 const WYFusionStore = (() => {
   const KEY = 'wy_fusion';
   const FUSE_COST = 20;        // 一次合契的墨錠費用（≈答對 10 題累積）
-  const FAIL_RATE = 0.2;       // 兩成失敗率——失敗只損墨錠（時間成本），不動資產
-  const CONSOLE_INK = 4;       // 合契失敗的安慰墨錠回饋
+  const FAIL_RATE = 0;         // 相容舊介面；學習證據達標後已改為保證成功
   const MASTERY_GATE = 0.8;    // 選文精通答對率門檻
   const MASTERY_MIN_TOTAL = 8; // 精通判定的最低作答量（與 WYStore 一致）
   const TOTAL_MIN = 30;        // 合契額外要求：每篇累積作答量 ≥30
   const NICK_MAX = 8;          // 暱稱上限字數
 
-  // 文魄全庫封頂 6 隻（控制生圖產量），配對取自本站 27 篇文豪，parents 為兩篇 textId。
+  // 文魄全庫封頂 6 隻（控制生圖產量），配對取自本站文章，parents 為兩篇 textId。
   // 曠達之魄為「同人雙篇」特例（蘇軾記承天寺夜遊 t08 × 赤壁賦 t21）。
   // 每隻兩個被動由玩家親選（賦創造力）：一個偏對戰、一個偏墨錠，effect 欄位對齊 fusion-adapter。
   const WENPO = [
@@ -113,12 +112,6 @@ const WYFusionStore = (() => {
   ];
   const WENPO_BY_ID = new Map(WENPO.map((w) => [w.id, w]));
 
-  const FAIL_LINES = [
-    '文氣未合，且再讀書——兩位先生的心志尚未真正相通，這幾枚墨錠拿去，改日再會。',
-    '知音難覓，本就急不得。你讀得還不夠深，墨錠散了些，但學問一分未減。',
-    '硯池的墨還不夠濃。文魄在紙背動了一下又沉了回去，牠感覺得到你，下次必接得住。',
-  ];
-
   function defaultFusion() {
     return { nickname: null, wenpo: {}, revealed: {}, active: null };
   }
@@ -133,15 +126,16 @@ const WYFusionStore = (() => {
     return fusion;
   }
 
-  // deps.mastery(textId) → { ratio, total }；只讀，不寫。
+  // deps.mastery(textId) → { mastered, ratio, total }；mastered 必須來自核心四題型判準，只讀不寫。
   function parentStat(textId, deps) {
-    const m = (deps && deps.mastery(textId)) || { ratio: 0, total: 0 };
+    const m = (deps && deps.mastery(textId)) || { mastered: false, ratio: 0, total: 0 };
     const ratio = Number(m.ratio) || 0;
     const total = Number(m.total) || 0;
-    const ok = ratio >= MASTERY_GATE && total >= MASTERY_MIN_TOTAL && total >= TOTAL_MIN;
+    const mastered = m.mastered === true;
+    const ok = mastered && ratio >= MASTERY_GATE && total >= MASTERY_MIN_TOTAL && total >= TOTAL_MIN;
     const title = deps && deps.title ? deps.title(textId) : textId;
     const author = deps && deps.author ? deps.author(textId) : '';
-    return { textId, title, author, ratio, total, ok };
+    return { textId, title, author, ratio, total, mastered, ok };
   }
 
   // 資格判定：兩篇皆符合核心精通門檻，且各累積作答量≥30，並有足夠合契費。
@@ -172,20 +166,14 @@ const WYFusionStore = (() => {
   }
 
   // 合契。deps: { rng?, getInk, spendInk, addInk, mastery, title?, author? }
-  // 回傳：成功 {ok:true,result:'success',wenpo}；失敗 {ok:true,result:'fail',line,inkBack}；擋下 {ok:false,reason}
+  // 回傳：達標後保證成功 {ok:true,result:'success',wenpo}；擋下 {ok:false,reason}
   // 雙親不消耗——本函式全程只讀 mastery，絕不寫任何選文進度。
   function fuse(fusion, wenpoId, deps) {
     fusion = ensure(fusion);
-    const rng = (deps && deps.rng) || Math.random;
     const gate = canFuse(fusion, wenpoId, deps);
     if (!gate.ok) return { fusion, ok: false, reason: gate.reason };
     const w = WENPO_BY_ID.get(wenpoId);
     if (!deps.spendInk(FUSE_COST)) return { fusion, ok: false, reason: 'ink' };
-    if (rng() < FAIL_RATE) {
-      const line = FAIL_LINES[Math.floor(rng() * FAIL_LINES.length)] || FAIL_LINES[0];
-      const inkBack = deps.addInk ? (deps.addInk(CONSOLE_INK), CONSOLE_INK) : 0;
-      return { fusion, ok: true, result: 'fail', line, inkBack };
-    }
     fusion.wenpo[wenpoId] = { bornAt: new Date().toISOString(), parents: w.parents.slice(), passive: null };
     return {
       fusion, ok: true, result: 'success',
@@ -286,8 +274,8 @@ const WYFusionStore = (() => {
   }
 
   return {
-    KEY, FUSE_COST, FAIL_RATE, CONSOLE_INK, MASTERY_GATE, TOTAL_MIN, MASTERY_MIN_TOTAL,
-    WENPO, WENPO_BY_ID, FAIL_LINES,
+    KEY, FUSE_COST, FAIL_RATE, MASTERY_GATE, TOTAL_MIN, MASTERY_MIN_TOTAL,
+    WENPO, WENPO_BY_ID,
     defaultFusion, ensure, getEligibility, canFuse, fuse, chooseWenpoPassive,
     answerRiddle, isRevealed, getPreview, setActive, activeMods, setNickname, listWenpo,
     loadFusion, saveFusion,

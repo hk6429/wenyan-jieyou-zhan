@@ -49,3 +49,22 @@ test('對戰答題後顯示正解與解析，由學生按鈕繼續', () => {
   assert.match(feedback[0], /id="battleContinue"/);
   assert.match(feedback[0], /currentQIdx \+= 1;\s*drawBattle\(\)/);
 });
+
+test('首頁只呈現一張五分鐘下一步，延後驗證完成後才標記穩固精通', () => {
+  assert.match(app, /WYStore\.nextAction\(TEXTS\)/);
+  assert.match(app, /今日五分鐘/);
+  assert.match(app, /startRetentionQuiz/);
+  assert.match(app, /WYStore\.recordRetentionCheck/);
+  assert.match(app, /今日已完成，收筆休息/);
+  assert.match(app, /穩固精通/);
+  assert.doesNotMatch(app, /別讓火苗熄了/);
+  assert.match(app, /可安心休息/);
+});
+
+test('選文詳情預設先讀原文，不在學生嘗試前直接揭露完整語譯', () => {
+  assert.match(app, /let segTabPreference = 'attempt'/);
+  assert.ok(app.indexOf("{ key: 'attempt'") < app.indexOf("{ key: 'translation'"));
+  assert.match(app, /先讀後揭/);
+  assert.match(app, /先用自己的話說一句/);
+  assert.match(app, /tabKey === 'translation'/);
+});

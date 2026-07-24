@@ -32,16 +32,17 @@ const WYRenown = (() => {
   }
 
   // 目前段位＋距下一段還差多少文名值（供進度條）
-  function rank() {
+  function rank(totalTexts = 0) {
     const sc = score();
     let cur = RANKS[0], next = null;
     let masteredCount = 0;
     try { masteredCount = WYStore.allMastered().length; } catch { /* store 未載入 */ }
+    const allMastered = Number.isInteger(totalTexts) && totalTexts > 0 && masteredCount >= totalTexts;
     for (let i = 0; i < RANKS.length; i++) {
-      if (RANKS[i].name === '文宗' && masteredCount !== 27) continue;
+      if (RANKS[i].name === '文宗' && !allMastered) continue;
       if (sc >= RANKS[i].at) { cur = RANKS[i]; next = RANKS[i + 1] || null; }
     }
-    if (cur.name === '大學士' && masteredCount !== 27) next = RANKS[RANKS.length - 1];
+    if (cur.name === '大學士' && !allMastered) next = RANKS[RANKS.length - 1];
     const span = next ? next.at - cur.at : 1;
     const into = next ? sc - cur.at : 1;
     return {

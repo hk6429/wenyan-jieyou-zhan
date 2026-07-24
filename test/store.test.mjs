@@ -158,3 +158,84 @@ test('錯題精通率只在真實答錯後再答對時提升', () => {
   S.recordAnswer('t01', true, 'char', { qId: 'fix-me' });
   assert.deepEqual(S.correctionStats(), { seen: 1, resolved: 1, ratio: 1 });
 });
+
+test('台灣日界線：UTC 午夜到早上八點仍算台灣當天，不沿用 UTC 日期', () => {
+  const S = loadStore();
+  assert.equal(S.taipeiDay(Date.UTC(2026, 6, 23, 16, 0)), '2026-07-24'); // 台灣 7/24 00:00
+  assert.equal(S.taipeiDay(Date.UTC(2026, 6, 24, 7, 59)), '2026-07-24'); // 台灣 7/24 15:59
+  assert.equal(S.taipeiDay(Date.UTC(2026, 6, 24, 16, 0)), '2026-07-25'); // 台灣 7/25 00:00
+});
+
+test('作答事件保留選項、信心、提示、來源與事後錯因，可形成診斷資料', () => {
+  const S = loadStore();
+  S.recordAnswer('t06', false, 'sentence', {
+    qId: 't06-q99',
+    selectedIndex: 2,
+    correctIndex: 1,
+    confidence: 'high',
+    hintUsed: true,
+    source: 'self-quiz',
+    nowMs: 123456789,
+  });
+  assert.equal(S.recordErrorReason('t06-q99', '我沒回到句子脈絡看'), true);
+  const [event] = S.learningEvents();
+  assert.deepEqual(event, {
+    qId: 't06-q99',
+    textId: 't06',
+    qType: 'sentence',
+    correct: false,
+    selectedIndex: 2,
+    correctIndex: 1,
+    confidence: 'high',
+    hintUsed: true,
+    source: 'self-quiz',
+    errorReason: '我沒回到句子脈絡看',
+    ts: 123456789,
+  });
+});
+
+test('雙層精通：當下達標七天後到期，通過延後驗證才成為穩固精通', () => {
+  const S = loadStore();
+  const learnedAt = Date.UTC(2026, 6, 1, 4, 0);
+  for (const ty of ['char', 'sentence', 'gist', 'theme']) {
+    for (let i = 0; i < 3; i++) {
+      S.recordAnswer('t06', true, ty, { qId: `${ty}-${i}`, nowMs: learnedAt });
+    }
+  }
+  let st = S.getTextState('t06');
+  assert.equal(st.mastered, true);
+  assert.equal(st.durableMastered, false);
+  assert.deepEqual(S.retentionDue(learnedAt + 6 * 86400000), []);
+  assert.deepEqual(S.retentionDue(learnedAt + 7 * 86400000).map((x) => x.textId), ['t06']);
+
+  const result = S.recordRetentionCheck('t06', 4, 5, { nowMs: learnedAt + 7 * 86400000 });
+  assert.equal(result.passed, true);
+  st = S.getTextState('t06');
+  assert.equal(st.durableMastered, true);
+  assert.equal(S.allDurableMastered().includes('t06'), true);
+});
+
+test('下一步處方一次只給一件事：先修錯題，再做延後驗證，否則續學最需要的篇目', () => {
+  const texts = [
+    { id: 't01', title: '較難篇', difficulty: 3 },
+    { id: 't06', title: '詠雪', difficulty: 1 },
+  ];
+  const S = loadStore();
+  assert.deepEqual(S.nextAction(texts), {
+    kind: 'start',
+    textId: 't06',
+    title: '從《詠雪》開始',
+    reason: '先用最短、最容易上手的一篇建立閱讀方法',
+    minutes: 5,
+    count: 8,
+  });
+
+  S.recordAnswer('t06', false, 'char', { qId: 'wrong-1' });
+  assert.equal(S.nextAction(texts).kind, 'wrong');
+
+  S.recordAnswer('t06', true, 'char', { qId: 'wrong-1' });
+  const state = S.load();
+  state.texts.t06 = { ...state.texts.t06, mastered: true, durableMastered: false, retentionDueDay: S.dayNum() };
+  S.save(state);
+  assert.equal(S.nextAction(texts).kind, 'retention');
+});

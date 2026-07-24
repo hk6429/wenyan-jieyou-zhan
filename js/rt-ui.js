@@ -322,7 +322,7 @@ const WYRt = (() => {
     const prev = B.local;
     B.local = L().resolveAnswer(prev, correct, { double: B.pendingDouble, comboBoost: B.pendingBoost });
     B.dmg += L().dealtDamage(prev, B.local);
-    if (correct) { B.dmg += bonusDmg(); B.correct += 1; } // 隨行文魄／文房裝備加成
+    if (correct) B.correct += 1; // 排名同儕戰只比作答；收藏與交易道具不影響公平性
     // 標記作答
     root.querySelectorAll('.rt-opt').forEach((b, i) => {
       if (i === q.answerIdx) b.classList.add('rt-opt--right');
@@ -549,7 +549,8 @@ const WYRt = (() => {
     const prev = B.local;
     B.local = L().resolveAnswer(prev, correct, { double: B.pendingDouble, comboBoost: B.pendingBoost });
     B.dmg += L().dealtDamage(prev, B.local);
-    if (correct) { B.dmg += bonusDmg(); B.correct += 1; } // 隨行文魄／文房裝備加成
+    const practiceBonus = B.bot && bonusDmg(); // 養成加成只留在不排名的硯靈對練
+    if (correct) { B.dmg += practiceBonus || 0; B.correct += 1; }
     root.querySelectorAll('.rt-opt').forEach((b, i) => {
       if (i === q.answerIdx) b.classList.add('rt-opt--right');
       else if (i === v) b.classList.add('rt-opt--wrong');
@@ -673,6 +674,15 @@ const WYRt = (() => {
       const correct = v === q.answerIdx;
       root.querySelectorAll('.rt-opt').forEach((x, i) => { if (i === q.answerIdx) x.classList.add('rt-opt--right'); else if (i === v) x.classList.add('rt-opt--wrong'); x.disabled = true; });
       if (correct) st.score += 1;
+      try {
+        WYStore.recordAnswer(q.textId, correct, q.type, {
+          qId: q.id,
+          countForMastery: false,
+          selectedIndex: v,
+          correctIndex: q.answerIdx,
+          source: 'class-meeting',
+        });
+      } catch { /* 本機儲存不可用時不阻斷文會作答 */ }
       st.answeredQ = st.curQ;
       const fb = root.querySelector('#rt-live-fb');
       if (fb) fb.textContent = correct ? '答對！等下一題…' : '答錯，等下一題…';
@@ -686,6 +696,7 @@ const WYRt = (() => {
         <h2>📡 文會結束</h2>
         <div class="rt-title-badge">本場答對 ${st.score} 題</div>
         <p class="rt-sub">為保護同學隱私，完整名單與本場講評僅提供持主持碼的教師查看。跟上一場的自己比就是進步。</p>
+        <p class="rt-sub">你本場答錯的題目，課後已整理到你的私人錯題修補；回首頁會看到唯一的下一步。</p>
         <div class="rt-result-btns"><button class="rt-btn rt-btn--main" data-back>返回擂台</button></div>
       </div>
     `);
@@ -773,6 +784,7 @@ const WYRt = (() => {
   function liveHostPanel(h) {
     clearTimers();
     let actionPending = false;
+    let projectorSafe = true;
     const draw = (phase, qNo, count) => {
       shell(`
         ${backBar('結束並離開')}
@@ -780,6 +792,7 @@ const WYRt = (() => {
           <h3>主持中・${esc(h.code)}</h3>
           <div class="rt-code">${esc(h.code)}</div>
           <p class="rt-sub">學生在「全班文會（學生）」輸入此班級碼進場。範圍：${scopeLabel(h.scope)}</p>
+          <label class="rt-projector-safe"><input type="checkbox" id="rt-projector-safe" checked> 投影安全模式（隱藏個別暱稱與排名）</label>
           <div class="rt-host-state">階段：${phase === 'lobby' ? '大廳（尚未出題）' : phase === 'end' ? '已結束' : `第 ${qNo}/${h.qn} 題`}　已答：${count} 人</div>
           <div class="rt-result-btns">
             <button class="rt-btn rt-btn--main" id="rt-h-next" ${phase === 'end' || actionPending ? 'disabled' : ''}>${phase === 'lobby' ? '出第一題' : qNo >= h.qn ? '收榜' : '下一題'}</button>
@@ -790,6 +803,11 @@ const WYRt = (() => {
         </div>
       `);
       const leave = root.querySelector('[data-back]');
+      const safeToggle = root.querySelector('#rt-projector-safe');
+      if (safeToggle) {
+        safeToggle.checked = projectorSafe;
+        safeToggle.addEventListener('change', () => { projectorSafe = safeToggle.checked; });
+      }
       if (leave) leave.addEventListener('click', async () => { await api('/api/rt-live', { op: 'end', code: h.code, pin: h.pin }); clearTimers(); home(); });
       const nx = root.querySelector('#rt-h-next');
       if (nx) nx.addEventListener('click', async () => {
@@ -850,9 +868,12 @@ const WYRt = (() => {
           </div>` : '';
         const el = root.querySelector('#rt-h-herald');
         try { localStorage.setItem(`wy_rt_lastheat:${h.code}`, JSON.stringify({ ts: Date.now(), hot, questions: questions.map((q) => ({ stem: q.stem, answer: q.options[q.answerIdx], textId: q.textId })) })); } catch { /* 略過 */ }
+        const rankingHtml = projectorSafe
+          ? `<div class="rt-projector-summary"><strong>投影安全模式已開啟</strong><p>全班共 ${rows.length} 人參與；個別暱稱與排名已隱藏，請以逐題統計進行講評。</p></div>`
+          : `<div class="rt-herald">${herald.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
+             <div class="rt-board">${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}</div>`;
         if (el) el.innerHTML = `
-          <div class="rt-herald">${herald.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
-          <div class="rt-board">${board.top.map((r2, i) => `<div class="rt-board-row"><span>${['🥇', '🥈', '🥉', '4', '5'][i]}</span><b>${esc(r2.nick)}</b><span>${r2.score} 題</span></div>`).join('')}</div>
+          ${rankingHtml}
           ${hotHtml}
           <section class="rt-review" aria-labelledby="rt-review-title">
             <h4 id="rt-review-title">本場講評</h4>

@@ -447,6 +447,19 @@ button.primary:active { transform: scale(.97); }
   color: var(--ink-zhong);
 }
 
+.seg-attempt {
+  padding: 12px 14px;
+  border-left: 3px solid var(--zhu);
+  border-radius: 6px;
+  background: rgba(158,59,44,.05);
+  color: var(--ink-zhong);
+}
+
+.seg-attempt p {
+  margin: 6px 0 0;
+  line-height: 1.75;
+}
+
 .glossary-list {
   margin: 0;
   padding-left: 1.1em;
@@ -787,6 +800,12 @@ nav.tabs.tabs-sub button.active { color: var(--zhu); background: var(--paper); }
 .se-opts{ display:flex; flex-wrap:wrap; gap:6px; }
 .se-btn{ padding:.5em .9em; min-height:44px; border:1px solid var(--ink-qing); border-radius:10px; background:var(--paper); color:var(--ink-nong); cursor:pointer; font-size:.86rem; transition:transform .08s,background .15s; }
 .se-btn:hover{ background:var(--paper-aged); transform:translateY(-1px); }
+.confidence-picker{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:10px 0; color:var(--ink-dan); font-size:.8rem; }
+.confidence-picker button{ min-height:44px; padding:.45em .8em; border:1px solid var(--ink-qing); border-radius:999px; background:var(--paper); color:var(--ink-zhong); cursor:pointer; }
+.confidence-picker button[aria-pressed="true"]{ background:var(--dai); border-color:var(--dai); color:#fff; font-weight:700; }
+.home-next{ border-left:4px solid var(--dai); }
+.home-next .hs-text small:first-child{ color:var(--zhu); font-weight:700; }
+.home-rest{ cursor:default; background:linear-gradient(90deg,rgba(64,104,91,.08),var(--paper)); }
 
 /* ⑧ 能力標籤專練 */
 .quiz-tag-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }

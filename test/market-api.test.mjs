@@ -78,6 +78,17 @@ test('post：合法上架回 id+claimKey，list 查得到', async () => {
   assert.equal(l.list[0].gearId, 'bi_tu');
   assert.equal(l.list[0].price, 50);
 });
+
+test('post：掛單憑證不自動過期，未售出道具可在任何時間下架拿回', async () => {
+  const db = createFakeD1();
+  const r = kvFor(db);
+  const a = await marketOp(r, { op: 'post', gearId: 'bi_tu', price: 50, seller: '小明', classCode: 'DEMO' }, ENV, OPEN_TS);
+  const exp = await db.prepare('SELECT exp FROM kv WHERE k=?1').bind(`wy_mkt:item:${a.id}`).first('exp');
+  assert.equal(exp, null);
+  const c = await marketOp(r, { op: 'cancel', id: a.id, claimKey: a.claimKey }, { ...ENV, forceOpen: false }, OPEN_TS + 60 * 86400 * 1000);
+  assert.equal(c.ok, 1);
+  assert.equal(c.gearId, 'bi_tu');
+});
 test('post：文魄/文豪、價格出帶、髒話暱稱、非開市全拒', async () => {
   const r = redis();
   assert.equal((await marketOp(r, { op: 'post', gearId: 'yinyi', price: 50, seller: '小明', classCode: 'DEMO' }, ENV, OPEN_TS)).ok, 0);

@@ -42,7 +42,7 @@ const genChCode = () => {
   return s;
 };
 
-// 選題範圍：mode single 需 textId（tNN）；level 需 level（J/S）；mixed 全 27 篇
+// 選題範圍：mode single 需 textId（tNN）；level 需 level（J/S）；mixed 使用全題庫
 const OK_MODE = new Set(['single', 'level', 'mixed']);
 const OK_LEVEL = new Set(['J', 'S']);
 function cleanScope(s) {

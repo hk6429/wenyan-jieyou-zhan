@@ -7,7 +7,7 @@ let currentQuizCombo = 0;
 let currentQuizComboPeak = 0;   // 本輪連對峰值（結算卡用）
 let currentQuizRound = { correct: 0, total: 0 }; // 本輪對錯統計（結算卡／全對彩蛋用）
 let currentBattle = null;
-let segTabPreference = 'translation';
+let segTabPreference = 'attempt';
 let pendingQuizNote = null; // 從選文詳情頁「對戰作者」但尚未解鎖時，導去自測並提示
 let currentMoodFilter = null; // 心情選文篩選（今天想解什麼憂）
 let currentListSort = 'difficulty'; // 首頁選文預設由易入難，可切回原編排
@@ -214,7 +214,7 @@ function renderList() {
   const mile = WYStore.consumeStreakMilestone(); // 跨連續天數里程碑（7/14/30…）本次慶祝一次
   const alive = WYStore.streakAlive();
   const streakHtml = streak.days > 0
-    ? `<div class="card streak-banner">${alive ? `🔥 連續學習 ${streak.days} 天${WYStore.studiedToday() ? '（今日已練 ✓）' : '　今天還沒練，別讓火苗熄了'}` : `🌱 上次連續 ${streak.days} 天很棒！今天重新起跑；最佳紀錄 ${streak.best || streak.days} 天。`}</div>`
+    ? `<div class="card streak-banner">${alive ? `🌿 累積學習 ${streak.days} 天${WYStore.studiedToday() ? '（今日已練 ✓，可以收筆休息）' : `　今天尚未練；仍有 ${streak.firePasses || 0} 天彈性，可安心休息`}` : `🌱 上次累積 ${streak.days} 天很棒！想回來時再接著學；最佳紀錄 ${streak.best || streak.days} 天。`}</div>`
     : '';
 
   let guideSeen = true;
@@ -224,7 +224,7 @@ function renderList() {
       <button class="guide-close" id="guideClose" aria-label="關閉">×</button>
       <h3>怎麼玩？三步驟</h3>
       <ol class="guide-steps">
-        <li><b>讀一篇</b>：看原文＋白話語譯＋注釋賞析。</li>
+        <li><b>讀一篇</b>：先讀原文並找證據，需要時才開注釋，最後再核對語譯。</li>
         <li><b>去「自測」練到精通</b>：${WYStore.MASTERY_RULE_TEXT}獎勵只算真實答對。</li>
         <li><b>「對戰」解鎖文豪</b>：單人闖關打文豪，精通更多篇解鎖後面的高手與「江湖」進階玩法。</li>
       </ol>
@@ -339,37 +339,31 @@ function masteryNudge(st) {
   return '';
 }
 
-// 續玩落點＋今日待複習＋錯題本：把已寫好卻沒露臉的 SRS 引擎搬上首頁（最強回訪理由）
+// 首頁只給一個可完成的下一步：避免同時丟出續玩、複習、錯題等多張卡造成選擇負擔。
 function renderHomeStatus() {
-  const cards = [];
-  const lastId = WYStore.getLastTextId();
-  const lastT = lastId ? TEXTS.find((x) => x.id === lastId) : null;
-  if (lastT) {
-    const lastDone = WYStore.getTextState(lastT.id).mastered;
-    const nextT = TEXTS.find((t) => !WYStore.getTextState(t.id).mastered);
-    const target = lastDone && nextT ? nextT : lastT;
-    const allDone = lastDone && !nextT;
-    cards.push(`<button class="home-status home-continue" data-act="${allDone ? 'caotang' : 'continue'}" data-id="${target.id}">
-      <span class="hs-icon">▶</span><span class="hs-text"><b>${allDone ? '前往解憂草堂' : lastDone ? `挑下一篇《${target.title}》` : `再練《${target.title}》一輪`}</b><small>${allDone ? `${TEXTS.length} 篇皆已精通，看看完整收藏` : '開一輪新的短關'}</small></span></button>`);
-  }
-  const due = WYStore.dueCount();
-  if (due > 0) cards.push(`<button class="home-status home-due" data-act="due">
-    <span class="hs-icon">📖</span><span class="hs-text"><b>今日待複習 ${due} 題</b><small>趁記憶正要淡去時複習，效果最好</small></span></button>`);
-  const wrongN = WYStore.wrongItems().length;
-  if (wrongN > 0) cards.push(`<button class="home-status home-wrong" data-act="wrong">
-    <span class="hs-icon">✍️</span><span class="hs-text"><b>錯題本 ${wrongN} 題</b><small>把上次錯的重新攻下來</small></span></button>`);
+  const action = WYStore.nextAction(TEXTS);
+  const icon = { wrong: '✍️', retention: '🧭', due: '📖', start: '▶', continue: '▶', rest: '🌿' }[action.kind] || '▶';
+  const actionCard = action.kind === 'rest'
+    ? `<div class="home-status home-next home-rest">
+        <span class="hs-icon">${icon}</span><span class="hs-text"><small>今日五分鐘</small><b>今日已完成，收筆休息</b><small>${action.reason}・全站共 ${TEXTS.length} 篇</small></span>
+      </div>`
+    : `<button class="home-status home-next" data-act="${action.kind}" data-id="${action.textId || ''}">
+        <span class="hs-icon">${icon}</span><span class="hs-text"><small>今日五分鐘・${action.count} 題</small><b>${action.title}</b><small>${action.reason}</small></span>
+      </button>`;
+  const cards = [actionCard];
   if (!WYStore.getClassCode()) cards.push(`<div class="home-status class-join-card"><span class="hs-icon">🏫</span><span class="hs-text"><b>輸入班級碼加入本班</b><small>老師有給 4–8 碼英數代碼嗎？一起衝文氣。</small></span><input id="homeClassCode" maxlength="8" aria-label="班級碼"><button class="primary" id="homeClassJoin">加入</button></div>`);
-  return cards.length ? `<div class="home-status-wrap">${cards.join('')}</div>` : '';
+  return `<div class="home-status-wrap">${cards.join('')}</div>`;
 }
 
 function bindHomeStatus() {
   app.querySelectorAll('.home-status, .weekly-card').forEach((btn) => {
     btn.addEventListener('click', () => {
       const act = btn.dataset.act;
-      if (act === 'continue') { currentTextId = btn.dataset.id; currentQuizType = null; setActiveTab('quiz'); renderQuiz(); }
+      if (act === 'start' || act === 'continue') { currentTextId = btn.dataset.id; currentQuizType = null; setActiveTab('quiz'); renderQuiz(); }
       else if (act === 'caotang') { setActiveTab('caotang'); WYCaotang.render(app); }
-      else if (act === 'due') startReviewQuiz(WYStore.dueItems().map((x) => x.qId), '今日複習');
-      else if (act === 'wrong') startReviewQuiz(WYStore.wrongItems(), '錯題本');
+      else if (act === 'retention') startRetentionQuiz(btn.dataset.id);
+      else if (act === 'due') startReviewQuiz(WYStore.dueItems().slice(0, 8).map((x) => x.qId), '今日複習');
+      else if (act === 'wrong') startReviewQuiz(WYStore.wrongItems().slice(0, 8), '錯題修補');
       else if (act === 'weekly') startWeeklyQuiz();
     });
   });
@@ -383,7 +377,7 @@ function bindHomeStatus() {
 
 // 文名段位主軸：把六個各自為政的養成系統收斂成一條「我到哪了」的上升線
 function renderRenownBar() {
-  const r = WYRenown.rank();
+  const r = WYRenown.rank(TEXTS.length);
   const nick = WYRenown.nickname();
   return `
     <div class="card renown-bar">
@@ -436,8 +430,9 @@ async function loadClassGoal() {
 }
 
 const SEG_TABS = [
-  { key: 'translation', label: '白話語譯' },
+  { key: 'attempt', label: '先自己讀' },
   { key: 'glossary', label: '字詞注釋' },
+  { key: 'translation', label: '白話語譯' },
   { key: 'note', label: '賞析' },
 ];
 
@@ -476,6 +471,7 @@ function renderDashboard(answeredArg) {
   const stats = WYStore.typeStats();
   const answered = answeredArg != null ? answeredArg : stats.reduce((s, x) => s + x.total, 0);
   const masteredCount = WYStore.allMastered().length;
+  const durableCount = WYStore.allDurableMastered().length;
   const corrections = WYStore.correctionStats();
   if (answered === 0) return ''; // 還沒作答就不佔版面
   const weakest = stats.filter((x) => x.total >= 3).sort((a, b) => a.ratio - b.ratio)[0];
@@ -494,7 +490,7 @@ function renderDashboard(answeredArg) {
     : (answered >= 8 ? '<p class="dash-advice">👍 各題型都在水準上，繼續保持！</p>' : '');
   return `
     <details class="card dash-card" open>
-      <summary>📊 我的學習儀表板　<small>已精通 ${masteredCount}/${TEXTS.length} 篇・答題 ${answered} 次・錯題精通率 ${corrections.seen ? Math.round(corrections.ratio * 100) + '%' : '尚無錯題'}</small></summary>
+      <summary>📊 我的學習儀表板　<small>本次達標 ${masteredCount}/${TEXTS.length} 篇・穩固精通 ${durableCount}/${TEXTS.length} 篇・答題 ${answered} 次・錯題精通率 ${corrections.seen ? Math.round(corrections.ratio * 100) + '%' : '尚無錯題'}</small></summary>
       <div class="dash-body">
         ${weakLine}
         ${bars}
@@ -591,6 +587,12 @@ function worryEchoHtml(t) {
 }
 
 function renderSegTabContent(seg, tabKey) {
+  if (tabKey === 'attempt') {
+    return `<div class="seg-attempt">
+      <strong>先讀後揭</strong>
+      <p>先找出「誰、做了什麼、語氣在哪裡轉折」，先用自己的話說一句。需要時才開字詞注釋，最後再核對白話語譯。</p>
+    </div>`;
+  }
   if (tabKey === 'translation') {
     return `<p class="seg-translation">${seg.translation || '（尚無語譯）'}</p>`;
   }
@@ -743,7 +745,40 @@ function startReviewQuiz(qIds, title) {
   drawQuiz();
 }
 
+function startRetentionQuiz(textId) {
+  const text = TEXTS.find((t) => t.id === textId);
+  if (!text) { setActiveTab('list'); renderList(); return; }
+  currentQuiz = WYQuiz.buildQuiz(textId, { n: SHORT_ROUND, ramp: true, seed: Date.now() });
+  currentQuiz.mode = 'retention';
+  currentQuiz.title = `七日驗證：《${text.title}》`;
+  currentQuizType = '__retention__';
+  _resetRound();
+  setActiveTab('quiz');
+  drawQuiz();
+}
+
 function _qTextId(q) { return q.textId || currentQuiz.textId; }
+
+function confidencePickerHtml() {
+  return `<div class="confidence-picker" aria-label="作答信心">
+    <span>作答前先估：</span>
+    <button type="button" data-confidence="low" aria-pressed="false">沒把握</button>
+    <button type="button" data-confidence="medium" aria-pressed="true">有點把握</button>
+    <button type="button" data-confidence="high" aria-pressed="false">很有把握</button>
+  </div>`;
+}
+
+function bindConfidencePicker(root = app) {
+  root.querySelectorAll('[data-confidence]').forEach((button) => {
+    button.addEventListener('click', () => {
+      root.querySelectorAll('[data-confidence]').forEach((other) => other.setAttribute('aria-pressed', other === button ? 'true' : 'false'));
+    });
+  });
+}
+
+function selectedConfidence(root = app) {
+  return root.querySelector('[data-confidence][aria-pressed="true"]')?.dataset.confidence || 'medium';
+}
 
 // 本輪結算卡（①）：把「馬拉松」切成可重複的爽脆小關——結束即結算＋一鍵再來，收尾不再是死路
 function quizSettlementHtml() {
@@ -752,10 +787,15 @@ function quizSettlementHtml() {
   const perfect = total > 0 && correct === total;
   const isReview = currentQuiz.mode === 'review';
   const isWeekly = currentQuiz.mode === 'weekly';
+  const isRetention = currentQuiz.mode === 'retention';
   const tId = currentQuiz.textId;
   const st = tId ? WYStore.getTextState(tId) : null;
   let masteryLine = '';
-  if (st && !isReview) {
+  if (isRetention && currentQuiz._retentionResult) {
+    masteryLine = currentQuiz._retentionResult.passed
+      ? '<p class="settle-mastery">✅ 七日後仍讀得懂，這篇已成為「穩固精通」。</p>'
+      : '<p class="settle-mastery">🌱 這次還不穩，明天會安排一輪短複習；本次達標與既有獎勵都不會被拿走。</p>';
+  } else if (st && !isReview) {
     if (st.mastered) {
       const t = TEXTS.find((x) => x.id === tId);
       masteryLine = `<p class="settle-mastery">🫧 硯靈低語：你聽懂了${t ? `「${t.worry}」` : '這位古人的憂'}。</p>`;
@@ -767,7 +807,7 @@ function quizSettlementHtml() {
   }
   const due = WYStore.dueCount();
   const btns = [`<button class="primary settle-again" id="settleAgain">🔁 再來一輪</button>`];
-  if (tId && !isReview && !isWeekly) btns.push(`<button class="primary settle-battle" id="settleBattle">⚔️ 去對戰作者</button>`);
+  if (tId && !isReview && !isWeekly && !isRetention) btns.push(`<button class="primary settle-battle" id="settleBattle">⚔️ 去對戰作者</button>`);
   if (due > 0) btns.push(`<button class="primary settle-review" id="settleReview">📖 複習到期 ${due} 題</button>`);
   btns.push(`<button class="link-back" id="settleHome">回選文</button>`);
   const milestone = WYStore.peekStreakMilestone();
@@ -804,7 +844,7 @@ function bindSettlement() {
   }
   const again = document.getElementById('settleAgain');
   if (again) again.onclick = () => {
-    if (currentQuiz.mode === 'review') { setActiveTab('list'); renderList(); return; }
+    if (currentQuiz.mode === 'review' || currentQuiz.mode === 'retention') { setActiveTab('list'); renderList(); return; }
     if (currentQuiz.mode === 'weekly') { startWeeklyQuiz(); return; }
     renderQuiz();
   };
@@ -821,9 +861,10 @@ function drawQuiz() {
   pendingQuizNote = null; // 只提示一次
   const isReview = currentQuiz.mode === 'review';
   const isWeekly = currentQuiz.mode === 'weekly';
+  const isRetention = currentQuiz.mode === 'retention';
   // 複習模式：只顯示標題＋離開，不顯示題型/標籤切換（跨篇混合）
-  const headerHtml = isReview
-    ? noteHtml + `<div class="card"><p class="quiz-focus">📖 ${currentQuiz.title}（跨篇複習）　<button class="link-back" id="quizPickOther">結束複習</button></p></div>`
+  const headerHtml = isReview || isRetention
+    ? noteHtml + `<div class="card"><p class="quiz-focus">📖 ${currentQuiz.title}（${isRetention ? '七日後驗證' : '跨篇複習'}）　<button class="link-back" id="quizPickOther">結束複習</button></p></div>`
     : isWeekly
       ? noteHtml + `<div class="card"><p class="quiz-focus">🏮 ${currentQuiz.title}（20 篇跨篇限時卷）　倒數 <strong id="weeklyTimer">10:00</strong>　<button class="link-back" id="quizPickOther">離開週賽</button></p><p class="weekly-note">同一週題目固定；成績只計真實答對，可重複挑戰最高分。</p></div>`
     : noteHtml + `
@@ -842,6 +883,13 @@ function drawQuiz() {
     } else if (currentQuizRound.total === 0 && currentQuiz.questions.length === 0) {
       app.innerHTML = headerHtml + '<div class="card"><h3>此範圍暫無題目</h3><p>換一篇或換題型／標籤。</p></div>';
     } else {
+      if (isRetention && !currentQuiz._retentionResult) {
+        currentQuiz._retentionResult = WYStore.recordRetentionCheck(
+          currentQuiz.textId,
+          currentQuizRound.correct,
+          currentQuizRound.total,
+        );
+      }
       app.innerHTML = headerHtml + quizSettlementHtml();
       bindSettlement();
     }
@@ -865,6 +913,7 @@ function drawQuiz() {
         <span class="badge">填空　${posBadge}</span>
         <p class="cloze-hint">白話提示：${q.hint}</p>
         <p class="passage cloze-prompt">${q.prompt}</p>
+        ${confidencePickerHtml()}
         <div class="cloze-input-row">
           <input type="text" id="clozeInput" class="cloze-input" placeholder="填入原文字詞" autocomplete="off" autocapitalize="off" />
           <button class="primary" id="clozeSubmit">作答</button>
@@ -872,6 +921,7 @@ function drawQuiz() {
         <div id="feedback" role="status" aria-live="polite" tabindex="-1"></div>
       </div>`;
     bindQuizTypeTabs();
+    bindConfidencePicker(quizStage);
     const input = document.getElementById('clozeInput');
     const submit = () => {
       if (input.disabled) return;
@@ -879,7 +929,10 @@ function drawQuiz() {
       input.disabled = true;
       document.getElementById('clozeSubmit').disabled = true;
       input.classList.add(isCorrect ? 'correct' : 'wrong');
-      const inkGain = gradeQuizAnswer(q, isCorrect, input, qTextId);
+      const inkGain = gradeQuizAnswer(q, isCorrect, input, qTextId, {
+        confidence: selectedConfidence(quizStage),
+        source: currentQuiz.mode || 'self-quiz',
+      });
       revealFeedback(isCorrect, inkGain, q, isCorrect ? '' : `正解是「${q.answerText}」。`);
     };
     document.getElementById('clozeSubmit').onclick = submit;
@@ -896,6 +949,7 @@ function drawQuiz() {
       ${companionHtml()}
       <span class="badge">${WYQuiz.typeLabel(q.type)}　${posBadge}</span>
       <p style="font-size:1.05rem;margin-top:10px;">${q.stem}</p>
+      ${confidencePickerHtml()}
       ${hintBeforeHtml}
       <div class="options">
         ${q.options.map((opt, i) => `<button data-i="${i}" aria-label="選項 ${i + 1}：${opt}" aria-pressed="false" aria-describedby="feedback">${opt}</button>`).join('')}
@@ -903,6 +957,7 @@ function drawQuiz() {
       <div id="feedback" role="status" aria-live="polite" tabindex="-1"></div>
     </div>`;
   bindQuizTypeTabs();
+  bindConfidencePicker(quizStage);
   const useHintBefore = document.getElementById('useHintBefore');
   if (useHintBefore) useHintBefore.onclick = () => {
     if (!WYStore.useHintTicket()) return;
@@ -925,7 +980,13 @@ function drawQuiz() {
         else if (bi === i) b.classList.add('wrong');
       });
       if (isCorrect) clicked.classList.add('pop');
-      const inkGain = gradeQuizAnswer(q, isCorrect, clicked, qTextId);
+      const inkGain = gradeQuizAnswer(q, isCorrect, clicked, qTextId, {
+        selectedIndex: i,
+        correctIndex: q.answerIdx,
+        confidence: selectedConfidence(quizStage),
+        hintUsed: !!(useHintBefore && useHintBefore.disabled),
+        source: currentQuiz.mode || 'self-quiz',
+      });
       if (isCorrect) revealFeedback(true, inkGain, q, '');
       else askSelfExplain(q, inkGain); // 答錯先自我解釋錯因，再揭示解析（生成效應打斷誤讀迴路）
     });
@@ -967,7 +1028,11 @@ function askSelfExplain(q, inkGain) {
       <div class="se-opts">${WRONG_REASONS.map((r, i) => `<button class="se-btn" data-i="${i}">${r}</button>`).join('')}</div>
     </div>`;
   fb.querySelectorAll('.se-btn').forEach((b) => {
-    b.addEventListener('click', () => revealFeedback(false, inkGain, q, '正解：'));
+    b.addEventListener('click', () => {
+      const r = WRONG_REASONS[Number(b.dataset.i)] || b.textContent;
+      WYStore.recordErrorReason(q.id, r);
+      revealFeedback(false, inkGain, q, '正解：');
+    });
   });
   fb.focus();
 }
@@ -982,12 +1047,12 @@ function renderTagChips() {
 
 // 自測作答計分共用：記錄（含 SRS qId、各自 textId）、精通里程碑掉落＋揭曉、班級文氣上報、連對音效／飄字。
 // 填空題（cloze）能力統計歸入「字義」，SRS 用自己的 qId 獨立追蹤。回傳本題墨錠入帳數。
-function gradeQuizAnswer(q, isCorrect, floatAnchor, qTextId) {
+function gradeQuizAnswer(q, isCorrect, floatAnchor, qTextId, evidence = {}) {
   const tId = qTextId || _qTextId(q);
   const qType = q.type === 'cloze' ? 'char' : q.type;
   const inkBefore = WYStore.getInk();
   const wasMastered = WYStore.getTextState(tId).mastered;
-  WYStore.recordAnswer(tId, isCorrect, qType, { qId: q.id });
+  WYStore.recordAnswer(tId, isCorrect, qType, { qId: q.id, ...evidence });
   const inkGain = WYStore.getInk() - inkBefore;
   currentQuizRound.total += 1;
   if (isCorrect) currentQuizRound.correct += 1;

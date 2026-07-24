@@ -9,7 +9,6 @@
 
   const KEY = 'wy_caotang';
   const VERSION = 1;
-  const TOTAL_TEXTS = 27;          // 全站選文數（gate 十境的分母）
   const TREASURY_CAP = 300;        // 藏書閣繁茂度以「累計答題量」對此上限換算百分比
 
   // 文氣十境（0→9）：越往中軸越繁茂
@@ -96,7 +95,7 @@
 
   // 精通判準必須與核心 WYStore.computeMastered 完全一致（白帽底線：不得在終局/成就面偷降門檻）：
   // 總數≥10、答對率≥80%、且四題型（字義/句義/段旨/篇章）各≥2 題——防止只狂刷單一題型就點亮
-  // 山門十境／掛軸／「精通全27篇」成就並對家長老師謊報精通。
+  // 山門十境／掛軸／「精通全部選文」成就不得對家長老師謊報精通。
   const CT_QUIZ_TYPES = ['char', 'sentence', 'gist', 'theme'];
   function isMastered(stat) {
     if (!stat || stat.total < 10 || !(stat.correct / stat.total >= 0.8)) return false;
@@ -160,11 +159,12 @@
     }
   }
 
-  // ── 文氣十境山門（唯讀 derive：已精通篇數 / 27 → 十階）─────────
+  // ── 文氣十境山門（唯讀 derive：已精通篇數 / 目前題庫篇數 → 十階）──
   function gateStage(texts, progress) {
+    const totalTexts = Math.max(1, Array.isArray(texts) ? texts.length : 0);
     const mastered = masteredTexts(texts, progress).length;
-    const ratio = mastered / TOTAL_TEXTS;
-    const stage = mastered === TOTAL_TEXTS
+    const ratio = mastered / totalTexts;
+    const stage = mastered === totalTexts
       ? GATE_STAGES.length - 1
       : Math.max(0, Math.min(GATE_STAGES.length - 2, Math.floor(ratio * GATE_STAGES.length)));
     return {
@@ -173,7 +173,7 @@
       bless: GATE_BLESS[stage],
       total: GATE_STAGES.length,
       masteredCount: mastered,
-      totalTexts: TOTAL_TEXTS,
+      totalTexts,
       pct: round(ratio * 100),
     };
   }
@@ -381,13 +381,14 @@
 
   // ── 成就牆（由真實統計 derive；只陳列榮譽＋進度，不做懲罰）──────
   function achievements(texts, progress, streak) {
+    const totalTexts = Math.max(1, Array.isArray(texts) ? texts.length : 0);
     const mastered = masteredTexts(texts, progress).length;
     const correct = totalCorrect(progress);
     const days = (streak && streak.days) || 0;
     const defs = [
       { id: 'first-scroll', name: '初通一篇', desc: '精通任一選文', now: mastered, need: 1 },
       { id: 'ten-scrolls', name: '博覽十篇', desc: '精通 10 篇選文', now: mastered, need: 10 },
-      { id: 'all-scrolls', name: '文宗大成', desc: '精通全部 27 篇', now: mastered, need: TOTAL_TEXTS },
+      { id: 'all-scrolls', name: '文宗大成', desc: `精通全部 ${totalTexts} 篇`, now: mastered, need: totalTexts },
       { id: 'diligent-100', name: '勤學不輟', desc: '累計答對 100 題', now: correct, need: 100 },
       { id: 'diligent-300', name: '筆耕不休', desc: '累計答對 300 題', now: correct, need: 300 },
       { id: 'streak-7', name: '七日連讀', desc: '連續學習 7 天', now: days, need: 7 },
@@ -414,7 +415,7 @@
   }
 
   const API = {
-    KEY, VERSION, TOTAL_TEXTS, TREASURY_CAP,
+    KEY, VERSION, TREASURY_CAP,
     GATE_STAGES, FLOURISH_TIERS, COURTS, DECOR_KINDS,
     defaultState, load, save,
     isMastered, textStat, totalCorrect, totalAnswers, masteredTexts,

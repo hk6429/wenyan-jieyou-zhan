@@ -8,14 +8,16 @@ const WYStore = (() => {
   const HINT_TICKET_COST = 30;
 
   function blank() {
-    return { texts: {}, streak: { last: null, days: 0, best: 0, firePasses: 2 }, inkIngots: 0, hintTickets: 0, caotangDecorPurchases: 0, classCode: null, inkDay: { date: null, earned: 0 }, lastTextId: null, recent: [], corrections: { seen: 0, resolved: 0 }, weekly: {} };
+    return { texts: {}, streak: { last: null, days: 0, best: 0, firePasses: 2 }, inkIngots: 0, hintTickets: 0, caotangDecorPurchases: 0, classCode: null, inkDay: { date: null, earned: 0 }, lastTextId: null, recent: [], corrections: { seen: 0, resolved: 0 }, weekly: {}, learningEvents: [] };
   }
 
   const RECENT_WINDOW = 8; // 心流訊號：只看最近 N 題滾動正確率，用於連錯救援／難度自適應（不看終身累計）
 
-  function todayStr() {
-    return new Date().toISOString().slice(0, 10);
+  function taipeiDay(nowMs = Date.now()) {
+    return new Date(nowMs + 8 * 3600 * 1000).toISOString().slice(0, 10);
   }
+
+  function todayStr() { return taipeiDay(); }
 
   function load() {
     try {
@@ -32,7 +34,7 @@ const WYStore = (() => {
 
   function getTextState(textId) {
     const state = load();
-    return state.texts[textId] || { seen: 0, correct: 0, total: 0, mastered: false };
+    return state.texts[textId] || { seen: 0, correct: 0, total: 0, mastered: false, durableMastered: false };
   }
 
   // 內部：在每日上限內賺取墨錠，回傳「實際入帳」數（可能被上限截斷成 0）。花費請走 addInk/spendInk（不受上限限制）。
@@ -71,7 +73,7 @@ const WYStore = (() => {
 
   // ── per-item 間隔複習 / 錯題本（SRS）：SRS「今天複習」、錯題重測、閃卡自評三者共用同一份 state.items ──
   function dayNum(ts) {
-    return Math.floor((ts == null ? Date.now() : ts) / 86400000);
+    return Math.floor(((ts == null ? Date.now() : ts) + 8 * 3600 * 1000) / 86400000);
   }
   // 簡化版 SM-2：grade ∈ {again(忘/答錯), hard(模糊), good(記得/答對)}。到期以「日序」記，不看時分。
   function _recordItemInto(state, qId, grade, textId) {
@@ -111,7 +113,23 @@ const WYStore = (() => {
     const countForMastery = opts.countForMastery !== false;
     const state = load();
     if (opts.qId) _recordItemInto(state, opts.qId, opts.grade || (isCorrect ? 'good' : 'again'), textId);
-    if (!state.texts[textId]) state.texts[textId] = { seen: 0, correct: 0, total: 0, mastered: false };
+    if (opts.qId) {
+      const event = {
+        qId: String(opts.qId),
+        textId: String(textId || ''),
+        qType: String(qType || ''),
+        correct: !!isCorrect,
+        selectedIndex: Number.isInteger(opts.selectedIndex) ? opts.selectedIndex : null,
+        correctIndex: Number.isInteger(opts.correctIndex) ? opts.correctIndex : null,
+        confidence: ['low', 'medium', 'high'].includes(opts.confidence) ? opts.confidence : 'medium',
+        hintUsed: opts.hintUsed === true,
+        source: String(opts.source || (opts.countForMastery === false ? 'battle' : 'self-quiz')),
+        errorReason: '',
+        ts: Number.isFinite(opts.nowMs) ? opts.nowMs : Date.now(),
+      };
+      state.learningEvents = [event, ...(Array.isArray(state.learningEvents) ? state.learningEvents : [])].slice(0, 200);
+    }
+    if (!state.texts[textId]) state.texts[textId] = { seen: 0, correct: 0, total: 0, mastered: false, durableMastered: false };
     const t = state.texts[textId];
     state.lastTextId = textId;                 // 續玩落點：回訪首頁「繼續練上次那篇」
     const mile = _touchStudyStreakInto(state); // 連續天數綁「真的有練」而非「有開站」（教育誠信）
@@ -133,10 +151,33 @@ const WYStore = (() => {
       }
       const newlyMastered = !t.mastered && computeMastered(t);
       t.mastered = t.mastered || newlyMastered;
-      if (newlyMastered) _earnInkInto(state, 20);
+      if (newlyMastered) {
+        const learnedDay = dayNum(opts.nowMs);
+        t.durableMastered = false;
+        t.masteredAtDay = learnedDay;
+        t.retentionDueDay = learnedDay + 7;
+        _earnInkInto(state, 20);
+      }
     }
     save(state);
     return t;
+  }
+
+  function learningEvents(limit = 200) {
+    const events = load().learningEvents;
+    return (Array.isArray(events) ? events : []).slice(0, Math.max(0, Math.min(200, Number(limit) || 0)));
+  }
+
+  function recordErrorReason(qId, reason) {
+    const value = String(reason || '').trim().slice(0, 80);
+    if (!qId || !value) return false;
+    const state = load();
+    const events = Array.isArray(state.learningEvents) ? state.learningEvents : [];
+    const event = events.find((x) => x.qId === qId && !x.correct && !x.errorReason);
+    if (!event) return false;
+    event.errorReason = value;
+    save(state);
+    return true;
   }
 
   // 閃卡三鍵自評（記得/模糊/忘了）等非計分情境更新 SRS：只動 state.items/錯題本，不碰精通與墨錠。
@@ -221,14 +262,100 @@ const WYStore = (() => {
     return Object.entries(state.texts).filter(([, v]) => v.mastered).map(([k]) => k);
   }
 
+  function allDurableMastered() {
+    const state = load();
+    return Object.entries(state.texts).filter(([, v]) => v.mastered && v.durableMastered === true).map(([k]) => k);
+  }
+
+  function retentionDue(nowMs = Date.now()) {
+    const today = dayNum(nowMs);
+    const state = load();
+    return Object.entries(state.texts)
+      .filter(([, t]) => t.mastered && t.durableMastered !== true && (t.retentionDueDay == null || t.retentionDueDay <= today))
+      .map(([textId, t]) => ({ textId, dueDay: t.retentionDueDay == null ? today : t.retentionDueDay }))
+      .sort((a, b) => a.dueDay - b.dueDay || a.textId.localeCompare(b.textId));
+  }
+
+  function recordRetentionCheck(textId, correct, total, opts = {}) {
+    if (!Number.isInteger(correct) || !Number.isInteger(total) || total < 5 || correct < 0 || correct > total) {
+      return { ok: false, passed: false, reason: 'bad-result' };
+    }
+    const state = load();
+    const t = state.texts[textId];
+    if (!t || !t.mastered) return { ok: false, passed: false, reason: 'not-mastered' };
+    const today = dayNum(opts.nowMs);
+    const due = t.retentionDueDay == null ? today : t.retentionDueDay;
+    if (today < due) return { ok: false, passed: false, reason: 'too-early', dueDay: due };
+    const passed = correct / total >= 0.8;
+    t.retentionChecks = (t.retentionChecks || 0) + 1;
+    t.lastRetention = { day: today, correct, total, passed };
+    if (passed) {
+      t.durableMastered = true;
+      t.durableMasteredAtDay = today;
+    } else {
+      t.durableMastered = false;
+      t.retentionDueDay = today + 1;
+    }
+    save(state);
+    return { ok: true, passed, correct, total, nextDueDay: passed ? null : t.retentionDueDay };
+  }
+
+  function nextAction(texts, nowMs = Date.now()) {
+    const catalog = Array.isArray(texts) ? texts : [];
+    const byId = Object.fromEntries(catalog.map((t) => [t.id, t]));
+    const wrong = wrongItems();
+    if (wrong.length) {
+      return {
+        kind: 'wrong', textId: null, title: `修補 ${Math.min(8, wrong.length)} 題錯題`,
+        reason: '先找出上次誤讀的原因，再做相近題確認真的修好', minutes: 5, count: Math.min(8, wrong.length),
+      };
+    }
+    const retention = retentionDue(nowMs)[0];
+    if (retention) {
+      const text = byId[retention.textId];
+      return {
+        kind: 'retention', textId: retention.textId, title: `驗證《${text ? text.title : retention.textId}》是否仍會`,
+        reason: '這篇已達標滿七天，用新一輪題目確認記憶是否穩固', minutes: 5, count: 8,
+      };
+    }
+    const due = dueItems();
+    if (due.length) {
+      return {
+        kind: 'due', textId: null, title: `複習 ${Math.min(8, due.length)} 題到期內容`,
+        reason: '趁記憶正要淡去時提取一次，比重讀更能留下來', minutes: 5, count: Math.min(8, due.length),
+      };
+    }
+    const state = load();
+    const last = state.lastTextId && byId[state.lastTextId];
+    const target = last && !getTextState(last.id).mastered
+      ? last
+      : catalog.slice().sort((a, b) => (a.difficulty || 9) - (b.difficulty || 9) || a.id.localeCompare(b.id))
+        .find((t) => !getTextState(t.id).mastered);
+    if (target) {
+      const first = !state.lastTextId;
+      return {
+        kind: first ? 'start' : 'continue',
+        textId: target.id,
+        title: first ? `從《${target.title}》開始` : `再練《${target.title}》一輪`,
+        reason: first ? '先用最短、最容易上手的一篇建立閱讀方法' : '接續上次尚未穩定的能力，不必重新找進度',
+        minutes: 5,
+        count: 8,
+      };
+    }
+    return {
+      kind: 'rest', textId: null, title: '今日已完成，收筆休息',
+      reason: '有效學習需要留白；明天再回來驗證，現在不用繼續刷題', minutes: 0, count: 0,
+    };
+  }
+
   // 連續學習天數：只在「今天真的練了（recordAnswer）」時前進，不因單純開站而+1（教育誠信）。
   // 回傳 { streak, milestone } —— milestone 為本次跨過的里程碑天數（7/14/30/50/100），否則 null。
   function _touchStudyStreakInto(state) {
     if (!state.streak) state.streak = { last: null, days: 0, best: 0, firePasses: 2 };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = taipeiDay();
     if (state.streak.last === today) return null; // 今天已記過，不重複前進
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const beforeYesterday = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const yesterday = taipeiDay(Date.now() - 86400000);
+    const beforeYesterday = taipeiDay(Date.now() - 2 * 86400000);
     if (state.streak.last === yesterday) state.streak.days += 1;
     else if (state.streak.last === beforeYesterday && (state.streak.firePasses || 0) > 0) {
       state.streak.days += 1;
@@ -252,7 +379,7 @@ const WYStore = (() => {
 
   // 今天是否已完成學習（用於首頁「今日已練」狀態）
   function studiedToday() {
-    return (getStreak().last === new Date().toISOString().slice(0, 10));
+    return getStreak().last === taipeiDay();
   }
 
   // 取出並清掉待慶祝的連續天數里程碑（跨過 7/14/30… 當次回傳一次，之後回 null）
@@ -269,7 +396,7 @@ const WYStore = (() => {
     const s = getStreak();
     if (!s.last) return false;
     const today = todayStr();
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const yesterday = taipeiDay(Date.now() - 86400000);
     return s.last === today || s.last === yesterday;
   }
 
@@ -405,9 +532,10 @@ const WYStore = (() => {
   }
 
   return {
-    load, save, getTextState, recordAnswer, recordItem, masteryRatio, allMastered, touchStreak, getStreak,
+    load, save, getTextState, recordAnswer, recordItem, masteryRatio, allMastered, allDurableMastered, touchStreak, getStreak,
     getInk, addInk, spendInk, earnInk, inkToday, DAILY_INK_CAP, typeStats, getClassCode, setClassCode,
-    computeMastered, dueItems, dueCount, wrongItems, correctionStats, recordWeeklyResult, weeklyResult, dayNum, removeItems,
+    computeMastered, dueItems, dueCount, wrongItems, correctionStats, recordWeeklyResult, weeklyResult, dayNum, taipeiDay, removeItems,
+    learningEvents, recordErrorReason, retentionDue, recordRetentionCheck, nextAction,
     getLastTextId, recentAccuracy, studiedToday, consumeStreakMilestone, peekStreakMilestone, streakAlive, exportAll, importAll,
     MASTERY_RULE_TEXT, INK_BY_TYPE, HINT_TICKET_COST, getHintTickets, buyHintTicket, useHintTicket, buyCaotangDecor,
     totalCorrect, companionLevel,

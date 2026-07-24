@@ -16,3 +16,12 @@ test('選項按鈕提供可讀名稱，作答後以 aria-pressed 標示正解，
   assert.ok(app.includes('✅ 答對了！'));
   assert.ok(app.includes('❌'));
 });
+
+test('自測在作答前可標記信心，答錯選擇的錯因會寫回學習事件', () => {
+  assert.match(app, /data-confidence="low"/);
+  assert.match(app, /data-confidence="medium"/);
+  assert.match(app, /data-confidence="high"/);
+  assert.match(app, /WYStore\.recordErrorReason\(q\.id,\s*r\)/);
+  assert.match(app, /selectedIndex:\s*i/);
+  assert.match(app, /hintUsed/);
+});
